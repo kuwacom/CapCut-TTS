@@ -1,0 +1,47 @@
+{
+    "pythonServer": {
+        "wsServer": {
+            "host": "0.0.0.0",
+            "port": 18000
+        },
+        "restServer": {
+            "host": "0.0.0.0",
+            "port": 18001
+        },
+        "corsPolicy": {
+            "origin": "http://localhost:3000"
+        },
+        "debug": false
+    },
+    "nodeServer": {
+        "pythonServerURL": "http://172.16.196.204:18001",
+        "wsServer": {
+            "host": "0.0.0.0",
+            "port": 18010
+        },
+        "restServer": {
+            "host": "0.0.0.0",
+            "port": 18011
+        },
+        "corsPolicy": {
+            "origin": "http://localhost:3000"
+        },
+        "debug": true,
+        "errorHandle": true,
+        "db": {
+            "imageDB": "./db",
+            "defaultpageSize": 10,
+            "maxSortpageSize": 40
+        }
+    },
+    "modelPath": {
+        "detect": "models/yolov7.pt",
+        "pose": "models/yolov7-w6-pose.pt"
+    },
+    "comment-device": "0",
+    "device": "0",
+    "detectImageSize": 640,
+    "augment": "",
+    "confThres": 0.2,
+    "iouThres": 0.3
+}
