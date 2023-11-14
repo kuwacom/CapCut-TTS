@@ -1,22 +1,43 @@
 import express, { Request, Response, text } from 'express';
 
-import logger from '../utils/log';
-import getToken from '../api/getToken';
 import getAudioBuffer from '../api/getAudioBuffer';
+import { USER } from '../token';
 export default async function synthesize(req: Request, res: Response) {
-    const tokenRes = await getToken();
-    if (!tokenRes) {
+
+    if (req.query.text === undefined) {
+        res.status(400).json({
+            error: "Bad Request"
+        });
+        return;
+    }
+    if (req.query.type === undefined) {
+        req.query.type = '0';
+    }
+    if (req.query.pitch === undefined) {
+        req.query.pitch = '10';
+    }
+    if (req.query.speed === undefined) {
+        req.query.speed = '10';
+    }
+    if (req.query.volume === undefined) {
+        req.query.volume = ' 10';
+    }
+
+
+    const audioBuffer = await getAudioBuffer(USER.token, USER.appKey,
+        req.query.text as string,
+        Number(req.query.type),
+        Number(req.query.pitch),
+        Number(req.query.speed),
+        Number(req.query.volume));
+
+    if (!audioBuffer) {
         res.status(500).json({
             error: "can't get token"
         });
         return;
     }
-    const audioBuffer = await getAudioBuffer(tokenRes.data.token, tokenRes.data.app_key,
-        "あいうえお", 0, 1, 1, 10);
-    // res.status(200).json({
-    //     state: "OK",
-    //     res: tokenRes
-    // });
+
     res.status(200).end(audioBuffer);
     return;
 }

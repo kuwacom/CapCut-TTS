@@ -59,6 +59,7 @@ export default function getAudioBuffer(token: string, appkey: string, text: stri
     }
     
     return new Promise((resolve, reject) => {
+        // WS Connect
         const ws = new WebSocket(env.ByteintlApi+"/ws");
         ws.on('open', () => {
             logger.debug("connect ws");
@@ -101,9 +102,5 @@ export default function getAudioBuffer(token: string, appkey: string, text: stri
             logger.error('WebSocket error:', error);
             resolve(null);
         });
-    
-        // setTimeout(() => {
-        //     resolve('Async operation completed');
-        // }, 1000);
     });
 }
