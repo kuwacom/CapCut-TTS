@@ -6,10 +6,10 @@ export default function getAudioBuffer(token: string, appkey: string, text: stri
 
     let speaker: string;
     if (type === 0) {
-        // 謎1
+        // 謎1 男子1
         speaker = "BV525_streaming";
     } else if (type === 1) {
-        // 謎2
+        // 謎2 坊や
         speaker = "BV528_streaming";
     } else if (type === 2) {
         // カワボ
@@ -24,7 +24,7 @@ export default function getAudioBuffer(token: string, appkey: string, text: stri
         // 女子
         speaker = "BV024_streaming";
     } else if (type === 6) {
-        // 男子
+        // 男子2
         speaker = "BV018_streaming";
     } else if (type === 7) {
         // 坊ちゃん
