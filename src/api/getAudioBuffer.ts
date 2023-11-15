@@ -6,56 +6,56 @@ export default function getAudioBuffer(token: string, appkey: string, text: stri
 
     let speaker: string;
     if (type === 0) {
-        // カワボ
-        speaker = "カワボ";
+        // 謎1
+        speaker = "BV525_streaming";
     } else if (type === 1) {
-        // お姉さん
-        speaker = "お姉さん";
+        // 謎2
+        speaker = "BV528_streaming";
     } else if (type === 2) {
-        // 少女
-        speaker = "少女";
-    } else if (type === 3) {
-        // 男子
-        speaker = "男子";
-    } else if (type === 4) {
-        // 坊ちゃん
-        speaker = "坊ちゃん";
-    } else if (type === 5) {
-        // 癒し系女子
-        speaker = "癒し系女子";
-    } else if (type === 6) {
-        // 女子アナ
-        speaker = "女子アナ";
-    } else if (type === 7) {
-        // 男性アナ
-        speaker = "男性アナ";
-    } else if (type === 8) {
-        // 元気ロリ
-        speaker = "元気ロリ";
-    } else if (type === 9) {
-        // 明るいハニー
-        speaker = "明るいハニー";
-    } else if (type === 10) {
-        // 優しいレディー
-        speaker = "優しいレディー";
-    } else if (type === 11) {
-        // 風雅メゾソプラノ
-        speaker = "風雅メゾソプラノ";
-    } else if (type === 12) {
-        // Naoki
-        speaker = "Naoki";
-    } else if (type === 13) {
-        // Sakura
-        speaker = "Sakura";
-    } else if (type === 14) {
-        // Keiko
-        speaker = "Keiko";
-    } else if (type === 15) {
-        // 7Miho
-        speaker = "Miho";
-    } else {
         // カワボ
-        speaker = "カワボ";
+        speaker = "BV017_streaming";
+    } else if (type === 3) {
+        // お姉さん
+        speaker = "BV016_streaming";
+    } else if (type === 4) {
+        // 少女
+        speaker = "BV023_streaming";
+    } else if (type === 5) {
+        // 女子
+        speaker = "BV024_streaming";
+    } else if (type === 6) {
+        // 男子
+        speaker = "BV018_streaming";
+    } else if (type === 7) {
+        // 坊ちゃん
+        speaker = "BV523_streaming";
+    } else if (type === 8) {
+        // 女子"
+        speaker = "BV521_streaming";
+    } else if (type === 9) {
+        // 女子アナ
+        speaker = "BV522_streaming";
+    } else if (type === 10) {
+        // 男性アナ
+        speaker = "BV524_streaming";
+    } else if (type === 11) {
+        // 元気ロリ
+        speaker = "BV520_streaming";
+    } else if (type === 12) {
+        // 明るいハニー
+        speaker = "VOV401_bytesing3_kangkangwuqu";
+    } else if (type === 13) {
+        // 優しいレディー
+        speaker = "VOV402_bytesing3_oh";
+    } else if (type === 14) {
+        // 風雅メゾソプラノ
+        speaker = "VOV402_bytesing3_aidelizan";
+    } else if (type === 15) {
+        // Sakura
+        speaker = "jp_005";
+    } else {
+        // お姉さん
+        speaker = "BV016_streaming";
     }
     
     return new Promise((resolve, reject) => {
@@ -70,8 +70,7 @@ export default function getAudioBuffer(token: string, appkey: string, text: stri
                 event: 'StartTask',
                 payload: JSON.stringify({
                     text: text,
-                    // speaker: speaker,
-                    speaker: "BV523_streaming",
+                    speaker: speaker,
                     pitch: pitch,
                     speed: speed,
                     volume: volume,
