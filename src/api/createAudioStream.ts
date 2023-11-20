@@ -59,5 +59,13 @@ export default function createAudioStream(token: string, appkey: string, text: s
         audioStream.push(null);
     });
 
+    audioStream.on('close', ()=>{
+        logger.debug(
+            "\nTask Stoped!!"+
+            "Tasking Time: "+((new Date().getTime())-startTime)+"ms"
+        );
+        ws.close();
+        return;
+    });
     return audioStream;
 }

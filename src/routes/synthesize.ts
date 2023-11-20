@@ -56,6 +56,7 @@ export default async function synthesize(req: Request, res: Response) {
             });
             return;
         }
+        res.on('close', () => audioStream.destroy());
         res.type('audio/wav');
         audioStream.on('data', (data)=>{
             res.write(data);
