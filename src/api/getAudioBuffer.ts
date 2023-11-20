@@ -98,6 +98,7 @@ export default function getAudioBuffer(token: string, appkey: string, text: stri
         });
     
         ws.on('error', (error) => {
+            ws.close();
             logger.error('WebSocket error:', error);
             resolve(null);
         });
