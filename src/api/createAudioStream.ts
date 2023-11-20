@@ -4,9 +4,12 @@ import logger from '../utils/log';
 import { WebSocket } from 'ws';
 import stream from 'stream';
 import speakerParser from '../utils/speakerParser';
+import { formatBytes } from '../utils/util';
 export default function createAudioStream(token: string, appkey: string, text: string, type: number, pitch: number = 10, speed: number = 10, volume: number = 10): stream.Readable | null {
     const audioStream = new stream.Readable();
     audioStream._read = () => {}
+    const startTime = new Date().getTime();
+    
     // WS Connect
     const ws = new WebSocket(env.ByteintlApi+"/ws");
     ws.on('open', () => {
@@ -35,11 +38,17 @@ export default function createAudioStream(token: string, appkey: string, text: s
             if (dataJson.event === 'TaskStarted') {
                 logger.debug("TaskStarted: "+dataJson.task_id);
             } else if (dataJson.event === 'TaskFinished') {
-                logger.debug("TaskFinished: "+dataJson.task_id);
+                logger.debug(
+                    "\nTaskFinished: "+dataJson.task_id+"\n"+
+                    "Tasking Time: "+((new Date().getTime())-startTime)+"ms"
+                );
                 ws.close();
                 audioStream.push(null);
             }
         } catch (error) {
+            logger.debug(
+                "Audio Chunk Size: "+formatBytes((data as Buffer).byteLength)
+            );
             audioStream.push(data as Buffer);
         }
     });
