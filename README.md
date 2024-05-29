@@ -14,7 +14,7 @@ CapCut の読み上げAPIのセルフホストRapperAPIです
 
 # How To Use
 ## .envファイルの作成
-`.env`ファイルを作成し、その中に以下の項目を作成してください。
+`.env.example`ファイルからコピーして`.env`ファイルを作成し、その中に以下の項目があるかを確認してください。
 ```
 DEVICE_TIME=""
 SIGN=""
