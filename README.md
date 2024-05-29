@@ -48,7 +48,7 @@ http://<host>:<port>/v1/
 ## エンドポイント
 ### synthesize
 #### リクエスト
-```
+```http
 GET /v1/synthesize
 ```
 #### クリエパラメーター
