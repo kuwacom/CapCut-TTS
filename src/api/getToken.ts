@@ -6,12 +6,12 @@ import logger from '../utils/log';
 
 export default async function getToken(): Promise<GetTokenRes | null> {
     const headers = new Headers();
-    headers.append('Appvr', '11.0.0');
+    headers.append('Appvr', '5.8.0');
     headers.append('Device-Time', env.DeviceTime);
-    headers.append('Pf', '1');
+    headers.append('Origin', 'https://www.capcut.com');
+    headers.append('Pf', '7');
     headers.append('Sign', env.Sign);
     headers.append('Sign-Ver', '1');
-    headers.append('Tdid', 'web');
     headers.append('User-Agent', env.UserAgent);
 
     try {
