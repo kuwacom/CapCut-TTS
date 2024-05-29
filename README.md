@@ -54,12 +54,12 @@ GET /v1/synthesize
 #### クリエパラメーター
 | パラメーター | 型 | 必須 | 説明 | デフォルト値 |
 |--------------|----|------|------|--------------|
-| `text`   | string | はい | 音声に変換するテキスト | - |
-| `type`   | number | いいえ | 使用する音声のタイプ | `0` |
+| `text`   | string | はい | 読み上げるテキスト | - |
+| `type`   | number | いいえ | 使用する合成音声のタイプ | `0` |
 | `pitch`  | number | いいえ | 合成された音声のピッチ | `10` |
 | `speed`  | number | いいえ | 合成された音声のスピード | `10` |
 | `volume` | number | いいえ | 合成された音声のボリューム | `10` |
-| `method` | string | いいえ | 音声合成に使用するメソッド<br>`buffer` または `stream` のいずれか | `buffer` |
+| `method` | string | いいえ | 合成された音声のレスポンスに使用するメソッド<br>`buffer` または `stream` のいずれか | `buffer` |
 
 #### レスポンス
 | ステータスコード | 状態 | 説明 | 内容 |
@@ -76,7 +76,7 @@ GET http://localhost:8080/v1/synthesize?text=こんにちは&type=0&pitch=10&spe
 #### レスポンス例
 | ステータスコード | Content-Type | 内容 |
 |------------------|--------------|------|
-| `200 OK` | audio/wav | WAV形式の音声コンテンツ |
+| `200 OK` | audio/wav | WAV形式の音声バッファ |
 
 ## Voice Type List
 | type | 声の種類          | スピーカーID            |
