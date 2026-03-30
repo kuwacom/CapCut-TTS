@@ -1,9 +1,11 @@
 import app from '@/app';
 import env from '@/configs/env';
 import logger from '@/services/logger';
-import { startTokenRefreshTask } from '@/services/token';
+import { startCapCutSessionTask } from '@/services/CapCutService';
 
-// エラーハンドリング
+/**
+ * サーバー起動エントリポイント
+ */
 if (env.ERROR_HANDLE) {
   process.on('uncaughtException', (error) => {
     logger.error('Uncaught exception', error);
@@ -23,5 +25,4 @@ server.on('error', (error) => {
   process.exit(1);
 });
 
-// TOKEN Task
-void startTokenRefreshTask();
+void startCapCutSessionTask();

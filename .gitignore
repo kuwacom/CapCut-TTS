@@ -4,6 +4,7 @@ dist/
 
 # env
 .env
+capcut-session.json
 
 # vscode
 .vscode/

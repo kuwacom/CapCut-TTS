@@ -1,6 +1,9 @@
 import { Router } from 'express';
-import v1Router from './v1';
+import v1Router from '@/routes/v1';
 
+/**
+ * ルートルーター
+ */
 const router = Router();
 
 router.use('/v1', v1Router);

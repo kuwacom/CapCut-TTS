@@ -1,10 +1,11 @@
 import type { Request, Response } from 'express';
-import createAudioStream from '@/api/createAudioStream';
-import getAudioBuffer from '@/api/getAudioBuffer';
 import { SynthesizeQuerySchema } from '@/schemas/synthesize';
+import capCutService from '@/services/CapCutService';
 import logger from '@/services/logger';
-import { getTokenState } from '@/services/token';
 
+/**
+ * 音声合成エンドポイント
+ */
 export const synthesize = async (req: Request, res: Response) => {
   const synthesizeQueryValidation = SynthesizeQuerySchema.safeParse(req.query);
 
@@ -18,55 +19,66 @@ export const synthesize = async (req: Request, res: Response) => {
 
   const synthesizeQuery = synthesizeQueryValidation.data;
 
-  let tokenState;
-  try {
-    tokenState = await getTokenState();
-  } catch (error) {
-    logger.error('CapCut token is unavailable.', error);
-    res.status(503).json({ error: 'CapCut token is unavailable' });
-    return;
-  }
-
   if (synthesizeQuery.method === 'stream') {
-    const audioStream = createAudioStream(
-      tokenState.token,
-      tokenState.appKey,
-      synthesizeQuery
-    );
+    try {
+      const audioStream = await capCutService.synthesizeStream(synthesizeQuery);
 
-    audioStream.on('error', (error) => {
-      logger.error('Failed to synthesize audio stream.', error);
+      audioStream.stream.on('error', (error) => {
+        logger.error('Failed to synthesize audio stream', error);
 
-      if (!res.headersSent) {
-        res.status(502).json({ error: 'Failed to synthesize audio' });
-        return;
+        if (!res.headersSent) {
+          res.status(502).json({ error: 'Failed to synthesize audio' });
+          return;
+        }
+
+        res.end();
+      });
+
+      res.on('close', () => {
+        if (!audioStream.stream.destroyed) {
+          audioStream.stream.destroy();
+        }
+      });
+
+      if (audioStream.contentLength) {
+        res.setHeader('Content-Length', audioStream.contentLength);
       }
 
-      res.end();
-    });
-
-    res.on('close', () => {
-      if (!audioStream.destroyed) {
-        audioStream.destroy();
+      if (audioStream.fileName) {
+        res.setHeader(
+          'Content-Disposition',
+          `attachment; filename="${audioStream.fileName}"`
+        );
       }
-    });
 
-    res.status(200);
-    res.type('audio/wav');
-    audioStream.pipe(res);
-    return;
+      res.status(200);
+      res.type(audioStream.contentType);
+      audioStream.stream.pipe(res);
+      return;
+    } catch (error) {
+      logger.error('Failed to synthesize audio stream', error);
+      res.status(502).json({ error: 'Failed to synthesize audio' });
+      return;
+    }
   }
 
-  const audioBuffer = await getAudioBuffer(
-    tokenState.token,
-    tokenState.appKey,
-    synthesizeQuery
-  );
+  try {
+    const audioResult = await capCutService.synthesizeBuffer(synthesizeQuery);
 
-  if (!audioBuffer) {
+    if (audioResult.contentLength) {
+      res.setHeader('Content-Length', audioResult.contentLength);
+    }
+
+    if (audioResult.fileName) {
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="${audioResult.fileName}"`
+      );
+    }
+
+    res.type(audioResult.contentType).status(200).end(audioResult.buffer);
+  } catch (error) {
+    logger.error('Failed to synthesize audio', error);
     res.status(502).json({ error: 'Failed to synthesize audio' });
-    return;
   }
-
-  res.type('audio/wav').status(200).end(audioBuffer);
 };

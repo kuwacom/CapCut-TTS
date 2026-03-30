@@ -1,8 +1,13 @@
 import { Router } from 'express';
-import synthesizeRouter from './synthesize';
+import modelsRouter from '@/routes/v1/models';
+import synthesizeRouter from '@/routes/v1/synthesize';
 
+/**
+ * v1 API ルーター
+ */
 const v1Router = Router();
 
+v1Router.use('/models', modelsRouter);
 v1Router.use('/synthesize', synthesizeRouter);
 
 v1Router.use((req, res) => {

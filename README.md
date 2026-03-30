@@ -1,17 +1,17 @@
-# CapCut TTS Rapper API
+# CapCut TTS Wrapper API
 
 [English README](./README.en.md)
 
-CapCut の TTS をシンプルな HTTP API として使いやすくする、セルフホストラッパーAPIです。
+CapCut Web に email / password でログインし、session を維持しながら最新の Web TTS 経路で音声を取得する、セルフホスト用ラッパー API です。
 
-このプロジェクトを使うと、CapCut 側の TTS リクエストに必要なトークン更新をサーバー側で吸収しながら、`GET /v1/synthesize` で音声を取得できます。
+旧来の `token + websocket` 方式ではなく、現在の CapCut Web の認証フローと `storyboard/v1/tts/multi_platform` に合わせています。
 
 ## できること
 
-- CapCut の TTS をシンプルな HTTP API として利用
+- CapCut Web に email / password でログインして session を維持
+- `GET /v1/synthesize` で MP3 音声を取得
 - `buffer` と `stream` の 2 つのレスポンス方式に対応
-- トークンの自動取得と定期更新
-- TypeScript + Express 5 ベースで運用しやすい構成
+- session を `capcut-session.json` に保存して再利用
 
 ## 注意事項
 
@@ -29,26 +29,19 @@ npm install
 
 ### 2. `.env` を作成
 
-macOS / Linux:
-
 ```bash
 cp .env.example .env
 ```
+### 3. CapCut の認証情報を設定
 
-Windows PowerShell:
-
-```powershell
-Copy-Item .env.example .env
-```
-
-### 3. `DEVICE_TIME` と `SIGN` を設定
-
-`.env` に最低限、次の 2 つを設定してください。
+最低限、次の 2 つを設定してください。
 
 ```env
-DEVICE_TIME=
-SIGN=
+CAPCUT_EMAIL=your-account@example.com
+CAPCUT_PASSWORD=your-password
 ```
+
+通常は他の値はデフォルトのままで動きます。
 
 ### 4. 開発サーバーを起動
 
@@ -56,43 +49,13 @@ SIGN=
 npm run dev
 ```
 
-デフォルトの待ち受け先:
-
-- `http://0.0.0.0:8080`
-- ブラウザやクライアントからのアクセス例: `http://localhost:8080`
-
 ### 5. API を呼び出す
 
 ```bash
-curl "http://localhost:8080/v1/synthesize?text=こんにちは&type=0&pitch=10&speed=10&volume=10&method=buffer" --output voice.wav
+curl "http://localhost:8080/v1/synthesize?text=こんにちは&type=0&method=buffer" --output voice.mp3
 ```
 
-## `DEVICE_TIME` と `SIGN` の取得方法
-
-CapCut にログインした状態で、ブラウザの DevTools を使って値を取得します。
-
-### 手順
-
-1. CapCut にログインし、空の新規プロジェクトを作成します
-2. 適当なテキストを追加して、テキスト読み上げタブへ移動します
-3. DevTools の Network を開き、`Clear Network log` でログを一度消します
-4. 適当な声を選んで音声を生成します
-5. 通信一覧から `token` を含む `POST` リクエストを探します
-6. そのリクエストヘッダーから `Device-Time` と `Sign` をコピーして `.env` に入れます
-
-通信が多い場合は、Network のフィルターで `token` と検索すると見つけやすいです。
-
-### 参考画像
-
-CapCut 側で TTS を生成する画面:
-
-![CapCut TTS screen](./images/1.png)
-
-Network から対象リクエストを探すイメージ:
-
-![CapCut Network log](./images/2.png)
-
-## API 仕様
+## API
 
 ### ベース URL
 
@@ -111,106 +74,84 @@ GET /v1/synthesize
 | パラメーター | 型 | 必須 | 説明 | デフォルト |
 | --- | --- | --- | --- | --- |
 | `text` | string | はい | 読み上げるテキスト | なし |
-| `type` | number | いいえ | 音声タイプ | `0` |
-| `pitch` | number | いいえ | ピッチ | `10` |
-| `speed` | number | いいえ | スピード | `10` |
-| `volume` | number | いいえ | ボリューム | `10` |
+| `type` | number | いいえ | 互換用の voice index | `0` |
+| `voice` | string | いいえ | 明示的な voice 指定。alias / `effectId` / `resourceId` / `speaker` を受け付けます | なし |
+| `pitch` | number | いいえ | 旧互換パラメーター。現在の Web TTS では未使用です | `10` |
+| `speed` | number | いいえ | 再生速度。`10` が等速です | `10` |
+| `volume` | number | いいえ | 音量。`10` が標準です | `10` |
 | `method` | string | いいえ | `buffer` または `stream` | `buffer` |
-
-### リクエスト例
-
-```http
-GET http://localhost:8080/v1/synthesize?text=こんにちは&type=0&pitch=10&speed=10&volume=10&method=buffer
-```
 
 ### レスポンス
 
 | ステータスコード | 内容 |
 | --- | --- |
-| `200 OK` | `audio/wav` を返します |
-| `400 Bad Request` | クエリパラメーターが不正です |
-| `502 Bad Gateway` | CapCut 側の音声生成に失敗しました |
-| `503 Service Unavailable` | トークンがまだ取得できていません |
+| `200 OK` | `audio/mpeg` |
+| `400 Bad Request` | クエリが不正 |
+| `502 Bad Gateway` | CapCut 側の認証または音声生成に失敗 |
 
-`method=buffer` の場合は音声全体をまとめて返します。  
-`method=stream` の場合は音声データを順次ストリームで返します。
+## `type`用 Voice 互換表
 
-OpenAPI 定義は [openapi.yaml](./openapi.yaml) を参照してください。
+`type` は次の固定 voice にマップされます。`voice` を使う場合は `alias` 列の値を指定できます。
 
-## Voice Type 一覧
+これら以外の音声は、`/v1/models`を参照してください。
 
-| type | 声の種類 | スピーカー ID |
+| type | alias | voice |
 | --- | --- | --- |
-| 0 | 謎1 男子1 | `BV525_streaming` |
-| 1 | 謎2 坊や | `BV528_streaming` |
-| 2 | カワボ | `BV017_streaming` |
-| 3 | お姉さん | `BV016_streaming` |
-| 4 | 少女 | `BV023_streaming` |
-| 5 | 女子 | `BV024_streaming` |
-| 6 | 男子2 | `BV018_streaming` |
-| 7 | 坊ちゃん | `BV523_streaming` |
-| 8 | 女子 | `BV521_streaming` |
-| 9 | 女子アナ | `BV522_streaming` |
-| 10 | 男性アナ | `BV524_streaming` |
-| 11 | 元気ロリ | `BV520_streaming` |
-| 12 | 明るいハニー | `VOV401_bytesing3_kangkangwuqu` |
-| 13 | 優しいレディー | `VOV402_bytesing3_oh` |
-| 14 | 風雅メゾソプラノ | `VOV402_bytesing3_aidelizan` |
-| 15 | Sakura | `jp_005` |
-| その他 / 未指定 | お姉さん | `BV016_streaming` |
+| `0` | `labebe` | ラベベさん |
+| `1` | `cool_lady` | 冷静なレディ |
+| `2` | `happy_dino` | ハッピーディノ |
+| `3` | `puppet` | おかしなあやつり人形 |
+| `4` | `popular_guy` | モテ男 |
+| `5` | `bratty_witch` | 生意気な魔女 |
+| `6` | `game_host` | ゲームホスト |
+| `7` | `calm_dubbing` | 穏やかな吹き替え |
+| `8` | `gruff_uncle` | 濁声おじさん |
+| `9` | `witch_granny` | 魔婆 |
+| `10` | `high_tension` | 高テンション |
+| `11` | `serious_man` | 真面目男 |
+| `12` | `manager` | マネージャー |
+| `13` | `little_sister` | 妹系 |
+| `14` | `young_girl` | 幼い女の子 |
+| `15` | `peaceful_woman` | 平和な女性 |
 
 ## 環境変数
 
 主要な環境変数は次のとおりです。
 
-| 変数名 | 説明 | 例 |
-| --- | --- | --- |
-| `CAPCUT_API_URL` | CapCut の token 取得 API | `https://edit-api-sg.capcut.com/lv/v1` |
-| `BYTEINTL_API_URL` | WebSocket 接続先のベース URL | `wss://sami-sg1.byteintlapi.com/internal/api/v1` |
-| `DEVICE_TIME` | CapCut 側リクエストから取得した値 | 取得必須 |
-| `SIGN` | CapCut 側リクエストから取得した値 | 取得必須 |
-| `USER_AGENT` | token 取得時に使う User-Agent | Chrome 系の値 |
-| `HOST` | サーバーの待ち受けホスト | `0.0.0.0` |
-| `PORT` | サーバーの待ち受けポート | `8080` |
-| `CORS_POLICY_ORIGIN` | CORS 許可 Origin | `*` |
-| `ORIGIN` | 旧構成との互換用 Origin 設定 | `*` |
-| `TOKEN_INTERVAL` | token の再取得間隔。単位は時間 | `6` |
+| 変数名 | 説明 |
+| --- | --- |
+| `CAPCUT_WEB_URL` | CapCut Web のベース URL |
+| `CAPCUT_EDIT_API_URL` | CapCut Edit API のベース URL |
+| `CAPCUT_LOGIN_HOST` | primary login host |
+| `CAPCUT_FALLBACK_LOGIN_HOST` | fallback login host |
+| `CAPCUT_EMAIL` | CapCut ログイン用 email |
+| `CAPCUT_PASSWORD` | CapCut ログイン用 password |
+| `CAPCUT_LOCALE` | API に送る locale |
+| `CAPCUT_PAGE_LOCALE` | login page URL の locale |
+| `CAPCUT_REGION` | CapCut request に使う region |
+| `CAPCUT_STORE_COUNTRY_CODE` | store-country-code header の値 |
+| `CAPCUT_DEVICE_ID` | device id を固定したい場合に指定 |
+| `CAPCUT_VERIFY_FP` | verifyFp を固定したい場合に指定 |
+| `CAPCUT_VOICE_CATEGORY_ID` | voice catalog 取得に使う category id |
+| `CAPCUT_SESSION_STORE_PATH` | session 保存先 |
+| `USER_AGENT` | CapCut へ送る User-Agent |
+| `SESSION_REFRESH_INTERVAL_MINUTES` | background session validation 間隔 |
+| `HOST` | サーバー待ち受け host |
+| `PORT` | サーバー待ち受け port |
+| `CORS_POLICY_ORIGIN` | CORS 許可 Origin |
 
 ## npm scripts
 
 | コマンド | 内容 |
 | --- | --- |
-| `npm run dev` | `tsx watch` で開発サーバーを起動 |
-| `npm run typecheck` | TypeScript の型チェック |
-| `npm run lint` | `src/**/*.ts` を ESLint で検査 |
-| `npm run lint:fix` | ESLint の自動修正 |
-| `npm run build` | `dist/` にビルド |
-| `npm run start` | ビルド済みのアプリを起動 |
-| `npm run test` | `build` 後に `start` を実行 |
-
-## ディレクトリ概要
-
-```text
-.
-├─ src/
-│  ├─ api/
-│  ├─ configs/
-│  ├─ middleware/
-│  ├─ routes/
-│  │  └─ v1/
-│  │     └─ synthesize/
-│  ├─ schemas/
-│  ├─ services/
-│  ├─ types/
-│  └─ utils/
-├─ images/
-├─ openapi.yaml
-├─ package.json
-└─ tsconfig.json
-```
+| `npm run dev` | 開発サーバー起動 |
+| `npm run typecheck` | TypeScript 型チェック |
+| `npm run lint` | ESLint |
+| `npm run build` | `dist/` へビルド |
+| `npm run start` | ビルド済みアプリ起動 |
 
 ## 補足
 
-- 起動時に token の取得を試行し、その後は `TOKEN_INTERVAL` 時間ごとに自動更新します
-- 最新構成では `CORS_POLICY_ORIGIN` を優先して参照します
-- 既存設定との互換のため、`ORIGIN` も引き続き読み取り可能です
+- 起動時に session の warmup を試み、その後は `SESSION_REFRESH_INTERVAL_MINUTES` ごとに検証します
+- `voice` に `effectId` / `resourceId` / `speaker` を直接渡しても選択できます
+- 現在の CapCut Web TTS は MP3 を返すため、レスポンスも `audio/mpeg` です
