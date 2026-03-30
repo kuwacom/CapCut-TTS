@@ -2,6 +2,7 @@ import app from '@/app';
 import env from '@/configs/env';
 import logger from '@/services/logger';
 import { startCapCutSessionTask } from '@/services/CapCutService';
+import { startLegacyTokenTask } from '@/services/LegacyCapCutService';
 
 /**
  * サーバー起動エントリポイント
@@ -26,3 +27,4 @@ server.on('error', (error) => {
 });
 
 void startCapCutSessionTask();
+void startLegacyTokenTask();

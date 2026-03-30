@@ -10,6 +10,7 @@ Instead of the old `token + websocket` approach, this project follows the curren
 
 - Log in to CapCut Web with email / password and keep the session alive
 - Fetch MP3 audio through `GET /v1/synthesize`
+- Fetch WAV audio through the old token + websocket flow via `GET /legacy/synthesize`
 - Support both `buffer` and `stream` response modes
 - Save and reuse the session in `capcut-session.json`
 
@@ -56,18 +57,28 @@ npm run dev
 curl "http://localhost:8080/v1/synthesize?text=Hello&type=0&method=buffer" --output voice.mp3
 ```
 
+If you want to use the old flow, configure `LEGACY_DEVICE_TIME` and `LEGACY_SIGN` and call:
+
+```bash
+curl "http://localhost:8080/legacy/synthesize?text=Hello&type=0&pitch=10&speed=10&volume=10&method=buffer" --output voice.wav
+```
+
 ## API
 
 ### Base URL
 
 ```text
-http://<host>:<port>/v1/
+http://<host>:<port>/
 ```
 
 ### Endpoint
 
 ```http
 GET /v1/synthesize
+```
+
+```http
+GET /legacy/synthesize
 ```
 
 ### Query Parameters
@@ -89,6 +100,9 @@ GET /v1/synthesize
 | `200 OK` | `audio/mpeg` |
 | `400 Bad Request` | Invalid query |
 | `502 Bad Gateway` | Authentication or synthesis failed on the CapCut side |
+
+`/legacy/synthesize` uses the old token + websocket flow and returns `audio/wav`.
+If `LEGACY_DEVICE_TIME` and `LEGACY_SIGN` are not configured, it returns `503 Service Unavailable`.
 
 ## Voice Compatibility Table For `type`
 
@@ -135,6 +149,11 @@ Main environment variables are listed below
 | `CAPCUT_VERIFY_FP` | Set this if you want to fix verifyFp |
 | `CAPCUT_VOICE_CATEGORY_ID` | Category id used when fetching the voice catalog |
 | `CAPCUT_SESSION_STORE_PATH` | Session persistence path |
+| `LEGACY_CAPCUT_API_URL` | Base URL for the old token API |
+| `LEGACY_BYTEINTL_API_URL` | Base URL for the old websocket endpoint |
+| `LEGACY_DEVICE_TIME` | Device-Time sent to the old token API |
+| `LEGACY_SIGN` | Sign sent to the old token API |
+| `LEGACY_TOKEN_INTERVAL` | Legacy token refresh interval in hours |
 | `USER_AGENT` | User-Agent sent to CapCut |
 | `SESSION_REFRESH_INTERVAL_MINUTES` | Background session validation interval |
 | `HOST` | Server bind host |
@@ -154,5 +173,6 @@ Main environment variables are listed below
 ## Additional Notes
 
 - The server attempts a session warmup on startup and validates it every `SESSION_REFRESH_INTERVAL_MINUTES`
+- When `LEGACY_DEVICE_TIME` and `LEGACY_SIGN` are set, the server also warms up the legacy token flow on startup
 - You can also pass `effectId`, `resourceId`, or `speaker` directly to `voice`
 - The current CapCut Web TTS returns MP3, so the response content type is `audio/mpeg`
