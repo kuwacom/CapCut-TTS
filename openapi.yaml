@@ -1,0 +1,99 @@
+openapi: 3.0.1
+
+info:
+  title: CapCut TTS Proxy
+  description: CapCut TTS API を扱いやすくするラッパープロキシ
+  version: 1.3.0
+
+servers:
+  - url: http://localhost:8080/v1
+    description: ローカル開発用サーバー
+
+paths:
+  /synthesize:
+    get:
+      summary: 音声合成
+      description: CapCut の TTS API を使って WAV 音声を返します。
+      tags:
+        - TTS
+      parameters:
+        - name: text
+          in: query
+          required: true
+          description: 読み上げるテキスト
+          schema:
+            type: string
+            example: こんにちは
+        - name: type
+          in: query
+          required: false
+          description: 音声タイプ
+          schema:
+            type: integer
+            default: 0
+        - name: pitch
+          in: query
+          required: false
+          description: ピッチ
+          schema:
+            type: integer
+            default: 10
+        - name: speed
+          in: query
+          required: false
+          description: スピード
+          schema:
+            type: integer
+            default: 10
+        - name: volume
+          in: query
+          required: false
+          description: ボリューム
+          schema:
+            type: integer
+            default: 10
+        - name: method
+          in: query
+          required: false
+          description: レスポンスの返し方
+          schema:
+            type: string
+            enum:
+              - buffer
+              - stream
+            default: buffer
+      responses:
+        '200':
+          description: 音声生成に成功した場合
+          content:
+            audio/wav:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: クエリパラメーターが不正な場合
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '502':
+          description: CapCut 側の音声生成に失敗した場合
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: CapCut トークンが取得できていない場合
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          example: Failed to synthesize audio

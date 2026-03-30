@@ -1,28 +1,38 @@
-import fetch, { Headers } from 'node-fetch';
+import env from '@/configs/env';
+import logger from '@/services/logger';
+import type { GetTokenResponse } from '@/types/response';
 
-import env from '../config/env';
-import { GetTokenRes } from '../types/response';
-import logger from '../utils/log';
+const CAPCUT_APP_VERSION = '5.8.0';
+const TOKEN_REQUEST_TIMEOUT_MS = 10_000;
 
-export default async function getToken(): Promise<GetTokenRes | null> {
-    const headers = new Headers();
-    headers.append('Appvr', '5.8.0');
-    headers.append('Device-Time', env.DeviceTime);
-    headers.append('Origin', 'https://www.capcut.com');
-    headers.append('Pf', '7');
-    headers.append('Sign', env.Sign);
-    headers.append('Sign-Ver', '1');
-    headers.append('User-Agent', env.UserAgent);
+export default async function getToken(): Promise<GetTokenResponse | null> {
+  const headers = new Headers({
+    Appvr: CAPCUT_APP_VERSION,
+    'Device-Time': env.DEVICE_TIME,
+    Origin: 'https://www.capcut.com',
+    Pf: '7',
+    Sign: env.SIGN,
+    'Sign-Ver': '1',
+    'User-Agent': env.USER_AGENT,
+  });
 
-    try {
-        const res = await fetch(env.CapCutAPIURL+"/common/tts/token", {
-            method: 'POST',
-            headers: headers
-        });
-        if (!res.ok) return null;
-        return await res.json();
-    } catch (error) {
-        logger.error("can't get token");
-        return null;
+  try {
+    const response = await fetch(`${env.CAPCUT_API_URL}/common/tts/token`, {
+      method: 'POST',
+      headers,
+      signal: AbortSignal.timeout(TOKEN_REQUEST_TIMEOUT_MS),
+    });
+
+    if (!response.ok) {
+      logger.error(
+        `Failed to fetch token: ${response.status} ${response.statusText}`
+      );
+      return null;
     }
+
+    return (await response.json()) as GetTokenResponse;
+  } catch (error) {
+    logger.error('Failed to fetch token.', error);
+    return null;
+  }
 }

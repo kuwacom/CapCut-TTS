@@ -1,31 +1,27 @@
-import express, { Request, Response } from 'express';
-import cors from 'cors';
-
-import logger from './utils/log';
-import env from './config/env';
-import synthesize from './routes/synthesize';
-import { tokenTask } from './token';
+import app from '@/app';
+import env from '@/configs/env';
+import logger from '@/services/logger';
+import { startTokenRefreshTask } from '@/services/token';
 
 // エラーハンドリング
-if (env.ErrorHandle) {
-    process.on("uncaughtException", (err) => {
-        logger.error(err.toString());
-    });
+if (env.ERROR_HANDLE) {
+  process.on('uncaughtException', (error) => {
+    logger.error('Uncaught exception', error);
+  });
+
+  process.on('unhandledRejection', (error) => {
+    logger.error('Unhandled rejection', error);
+  });
 }
 
+const server = app.listen(env.PORT, env.HOST, () => {
+  logger.info(`Server is running on: http://${env.HOST}:${env.PORT}`);
+});
+
+server.on('error', (error) => {
+  logger.error('Server failed to start.', error);
+  process.exit(1);
+});
+
 // TOKEN Task
-tokenTask();
-
-const app = express();
-app.use(cors({ origin: env.Origin })); // cors 設定
-app.listen(env.Port, env.Host, () => {
-    logger.info(`Server is running on: http://${env.Host}:${env.Port}`);
-});
-
-// restServer
-const mainRouter = express.Router();
-app.use('/v1', mainRouter);
-app.use((req, res, next) => {
-    res.status(404).end();
-});
-mainRouter.get('/synthesize', synthesize);
+void startTokenRefreshTask();

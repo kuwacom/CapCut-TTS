@@ -1,0 +1,17 @@
+[Unit]
+Description=capcut-tts
+Wants=network-online.target
+After=syslog.target network.target nss-lookup.target network-online.target
+
+[Service]
+ExecStart=/bin/sh <enter the run.sh of full path>
+WorkingDirectory=<enter the project folder of full path>
+ExecReload=/bin/kill -s HUP $MAINPID
+ExecStop=/bin/kill -s INT $MAINPID
+Restart=always
+User=<enter the user>
+Group=<enter the group>
+TimeoutStartSec=60
+
+[Install]
+WantedBy=multi-user.target
