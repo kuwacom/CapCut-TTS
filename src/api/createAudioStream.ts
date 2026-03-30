@@ -1,71 +1,83 @@
-import env from '../config/env';
-import { Synthesize, SynthesizePayload, TaskStatus } from '../types/capcut';
-import logger from '../utils/log';
+import { Readable } from 'node:stream';
 import { WebSocket } from 'ws';
-import stream from 'stream';
-import speakerParser from '../utils/speakerParser';
-import { formatBytes } from '../utils/util';
-export default function createAudioStream(token: string, appkey: string, text: string, type: number, pitch: number = 10, speed: number = 10, volume: number = 10): stream.Readable | null {
-    const audioStream = new stream.Readable();
-    audioStream._read = () => {}
-    const startTime = new Date().getTime();
-    
-    // WS Connect
-    const ws = new WebSocket(env.ByteintlApi+"/ws");
-    ws.on('open', () => {
-        logger.debug("connect ws");
-        ws.send(JSON.stringify({
-            token: token,
-            appkey: appkey,
-            namespace: 'TTS',
-            event: 'StartTask',
-            payload: JSON.stringify({
-                text: text,
-                speaker: speakerParser(type),
-                pitch: pitch,
-                speed: speed,
-                volume: volume,
-                rate: 24000,
-                appid: '348188',
-            } as SynthesizePayload)
-        } as Synthesize));
-    });
-    
-    ws.on('message', (data) => {
-        try {
-            const dataJson = JSON.parse(data.toString()) as TaskStatus;
-            
-            if (dataJson.event === 'TaskStarted') {
-                logger.debug("TaskStarted: "+dataJson.task_id);
-            } else if (dataJson.event === 'TaskFinished') {
-                logger.debug(
-                    "\nTaskFinished: "+dataJson.task_id+"\n"+
-                    "Tasking Time: "+((new Date().getTime())-startTime)+"ms"
-                );
-                ws.close();
-                audioStream.push(null);
-            }
-        } catch (error) {
-            logger.debug(
-                "Audio Chunk Size: "+formatBytes((data as Buffer).byteLength)
-            );
-            audioStream.push(data as Buffer);
-        }
-    });
+import {
+  buildTaskMessage,
+  getWebSocketUrl,
+  parseTaskStatus,
+  rawDataToBuffer,
+} from '@/utils/capcut';
+import logger from '@/services/logger';
+import type { SynthesizeOptions } from '@/types/capcut';
 
-    ws.on('error', (error) => {
-        ws.close();
-        logger.error('WebSocket error:', error);
-        audioStream.push(null);
-    });
+export default function createAudioStream(
+  token: string,
+  appKey: string,
+  options: SynthesizeOptions
+): Readable {
+  const audioStream = new Readable({
+    read() {},
+  });
+  const startedAt = Date.now();
 
-    audioStream.on('close', ()=>{
-        logger.debug(
-            "\nTask Stoped!!"+
-            "Tasking Time: "+((new Date().getTime())-startTime)+"ms"
-        );
-        ws.close();
-        return;
-    });
-    return audioStream;
+  // WS Connect
+  const ws = new WebSocket(getWebSocketUrl());
+  let taskFinished = false;
+
+  ws.on('open', () => {
+    logger.debug('Connected to CapCut websocket.');
+    ws.send(JSON.stringify(buildTaskMessage(token, appKey, options)));
+  });
+
+  ws.on('message', (data) => {
+    const taskStatus = parseTaskStatus(data);
+
+    if (!taskStatus) {
+      audioStream.push(rawDataToBuffer(data));
+      return;
+    }
+
+    if (taskStatus.event === 'TaskStarted') {
+      logger.debug(`TaskStarted: ${taskStatus.task_id}`);
+      return;
+    }
+
+    if (taskStatus.event === 'TaskFinished') {
+      taskFinished = true;
+      logger.debug(
+        `TaskFinished: ${taskStatus.task_id} / Tasking Time: ${
+          Date.now() - startedAt
+        }ms`
+      );
+      ws.close();
+      audioStream.push(null);
+    }
+  });
+
+  ws.on('error', (error) => {
+    logger.error('WebSocket error while streaming audio.', error);
+    audioStream.destroy(
+      error instanceof Error ? error : new Error('CapCut websocket error')
+    );
+  });
+
+  ws.on('close', () => {
+    if (!taskFinished && !audioStream.destroyed && !audioStream.readableEnded) {
+      audioStream.destroy(
+        new Error('CapCut websocket closed before the task finished')
+      );
+    }
+  });
+
+  audioStream.on('close', () => {
+    logger.debug(`Audio stream closed after ${Date.now() - startedAt}ms`);
+
+    if (
+      ws.readyState === WebSocket.CONNECTING ||
+      ws.readyState === WebSocket.OPEN
+    ) {
+      ws.close();
+    }
+  });
+
+  return audioStream;
 }

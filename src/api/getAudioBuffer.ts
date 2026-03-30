@@ -1,59 +1,75 @@
-import env from '../config/env';
-import { Synthesize, SynthesizePayload, TaskStatus } from '../types/capcut';
-import logger from '../utils/log';
 import { WebSocket } from 'ws';
-import speakerParser from '../utils/speakerParser';
-import { formatBytes } from '../utils/util';
-export default function getAudioBuffer(token: string, appkey: string, text: string, type: number, pitch: number = 10, speed: number = 10, volume: number = 10): Promise<Buffer | null> {
-    return new Promise((resolve, reject) => {
-        let audioBuffer: Buffer = Buffer.from([]);
-        const startTime = new Date().getTime();
+import {
+  buildTaskMessage,
+  getWebSocketUrl,
+  parseTaskStatus,
+  rawDataToBuffer,
+} from '@/utils/capcut';
+import logger from '@/services/logger';
+import type { SynthesizeOptions } from '@/types/capcut';
+import { formatBytes } from '@/utils/utils';
 
-        // WS Connect
-        const ws = new WebSocket(env.ByteintlApi+"/ws");
-        ws.on('open', () => {
-            logger.debug("connect ws");
-            ws.send(JSON.stringify({
-                token: token,
-                appkey: appkey,
-                namespace: 'TTS',
-                event: 'StartTask',
-                payload: JSON.stringify({
-                    text: text,
-                    speaker: speakerParser(type),
-                    pitch: pitch,
-                    speed: speed,
-                    volume: volume,
-                    rate: 24000,
-                    appid: '348188',
-                } as SynthesizePayload)
-            } as Synthesize));
-        });
+export default function getAudioBuffer(
+  token: string,
+  appKey: string,
+  options: SynthesizeOptions
+): Promise<Buffer | null> {
+  return new Promise((resolve) => {
+    let audioBuffer = Buffer.alloc(0);
+    let settled = false;
+    const startedAt = Date.now();
 
-        ws.on('message', (data) => {
-            try {
-                const dataJson = JSON.parse(data.toString()) as TaskStatus;
-                
-                if (dataJson.event === 'TaskStarted') {
-                    logger.debug("TaskStarted: "+dataJson.task_id);
-                } else if (dataJson.event === 'TaskFinished') {
-                    logger.debug(
-                        "\nTaskFinished: "+dataJson.task_id+"\n"+
-                        "Audio Buffer Size: "+formatBytes(audioBuffer.byteLength)+"\n"+
-                        "Tasking Time: "+((new Date().getTime())-startTime)+"ms"
-                    );
-                    ws.close();
-                    resolve(audioBuffer);
-                }
-            } catch (error) {
-                audioBuffer = Buffer.concat([audioBuffer, data as Buffer]);
-            }
-        });
-    
-        ws.on('error', (error) => {
-            ws.close();
-            logger.error('WebSocket error:', error);
-            resolve(null);
-        });
+    // WS Connect
+    const ws = new WebSocket(getWebSocketUrl());
+
+    const finalize = (buffer: Buffer | null) => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      resolve(buffer);
+    };
+
+    ws.on('open', () => {
+      logger.debug('Connected to CapCut websocket.');
+      ws.send(JSON.stringify(buildTaskMessage(token, appKey, options)));
     });
+
+    ws.on('message', (data) => {
+      const taskStatus = parseTaskStatus(data);
+
+      if (!taskStatus) {
+        audioBuffer = Buffer.concat([audioBuffer, rawDataToBuffer(data)]);
+        return;
+      }
+
+      if (taskStatus.event === 'TaskStarted') {
+        logger.debug(`TaskStarted: ${taskStatus.task_id}`);
+        return;
+      }
+
+      if (taskStatus.event === 'TaskFinished') {
+        logger.debug(
+          `TaskFinished: ${taskStatus.task_id} / Audio Buffer Size: ${formatBytes(
+            audioBuffer.byteLength
+          )} / Tasking Time: ${Date.now() - startedAt}ms`
+        );
+        ws.close();
+        finalize(audioBuffer);
+      }
+    });
+
+    ws.on('error', (error) => {
+      logger.error('WebSocket error while buffering audio.', error);
+      finalize(null);
+    });
+
+    ws.on('close', () => {
+      if (!settled) {
+        logger.warn('CapCut websocket closed before the task finished.');
+        finalize(null);
+      }
+    });
+  });
 }
