@@ -13,6 +13,7 @@ Instead of the old `token + websocket` approach, this project follows the curren
 - Fetch WAV audio through the old token + websocket flow via `GET /legacy/synthesize`
 - Support both `buffer` and `stream` response modes
 - Save and reuse the session in `capcut-session.json`
+- Save and reuse bundle-derived runtime settings in `capcut-bundle-config.json`
 
 ## Notes
 
@@ -62,6 +63,49 @@ If you want to use the old flow, configure `LEGACY_DEVICE_TIME` and `LEGACY_SIGN
 ```bash
 curl "http://localhost:8080/legacy/synthesize?text=Hello&type=0&pitch=10&speed=10&volume=10&method=buffer" --output voice.wav
 ```
+
+## How Bundle Config Works
+
+This project stores settings discovered from CapCut Web bundles in `capcut-bundle-config.json`.
+
+That file can contain values such as:
+
+- login and account endpoint paths
+- editor and TTS endpoint paths
+- version-related values such as `appvr`, `version_name`, and `sdk_version`
+- the sign recipe used for edit API requests
+- discovered voice category ids
+
+`capcut-bundle-config.json` is effectively a cache of bundle information fetched from real CapCut pages. If the file already exists and its contents are still within the cache window, the server does not need to re-fetch bundle pages every time.
+
+The service will try live extraction again when:
+
+- `capcut-bundle-config.json` does not exist yet
+- the cache has expired
+- the current cached values are not sufficient
+
+This means HAR files are not required for normal operation. As long as the server can access CapCut pages, it can discover bundle settings dynamically, save them to `capcut-bundle-config.json`, and reuse them on later runs.
+
+## HAR and `capcut:extract`
+
+`npm run capcut:extract` is an optional helper command that generates `capcut-bundle-config.json` from HAR files.
+
+```bash
+npm run capcut:extract
+```
+
+This command is not required for normal runtime. It is mainly useful when you want to:
+
+- preload known bundle values from HAR before the first startup
+- prepare bundle settings without relying on live page access first
+- investigate CapCut changes offline
+
+The current implementation does not rely on blindly hardcoded constants. Instead, it prefers values discovered from one of these sources and stores them in `capcut-bundle-config.json`:
+
+- values extracted from HAR files
+- values extracted live from real CapCut pages
+
+In other words, the operating model is: reuse saved bundle settings first, and refresh them only when needed.
 
 ## API
 
@@ -147,6 +191,7 @@ Main environment variables are listed below
 | `CAPCUT_STORE_COUNTRY_CODE` | Value for the `store-country-code` header |
 | `CAPCUT_DEVICE_ID` | Set this if you want to fix the device id |
 | `CAPCUT_VERIFY_FP` | Set this if you want to fix verifyFp |
+| `CAPCUT_BUNDLE_CONFIG_PATH` | Path for the persisted bundle config cache |
 | `CAPCUT_VOICE_CATEGORY_ID` | Category id used when fetching the voice catalog |
 | `CAPCUT_SESSION_STORE_PATH` | Session persistence path |
 | `LEGACY_CAPCUT_API_URL` | Base URL for the old token API |
@@ -169,10 +214,12 @@ Main environment variables are listed below
 | `npm run lint` | ESLint |
 | `npm run build` | Build to `dist/` |
 | `npm run start` | Start the built app |
+| `npm run capcut:extract` | Generate `capcut-bundle-config.json` from HAR files |
 
 ## Additional Notes
 
 - The server attempts a session warmup on startup and validates it every `SESSION_REFRESH_INTERVAL_MINUTES`
+- When bundle settings are needed, the server loads `capcut-bundle-config.json` first and refreshes it through live extraction only when necessary
 - When `LEGACY_DEVICE_TIME` and `LEGACY_SIGN` are set, the server also warms up the legacy token flow on startup
 - You can also pass `effectId`, `resourceId`, or `speaker` directly to `voice`
 - The current CapCut Web TTS returns MP3, so the response content type is `audio/mpeg`

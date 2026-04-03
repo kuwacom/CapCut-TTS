@@ -3,6 +3,7 @@ import type { ApiRequester } from '@/types/api';
 
 interface CreateTtsTaskParams {
   requester: ApiRequester;
+  path?: string;
   searchParams: Record<string, string>;
   headers: HeadersInit;
   body: BodyInit;
@@ -13,13 +14,14 @@ interface CreateTtsTaskParams {
  */
 export const createTtsTask = ({
   requester,
+  path,
   searchParams,
   headers,
   body,
 }: CreateTtsTaskParams) =>
   CapCutEditApiClient.request({
     requester,
-    path: '/lv/v2/intelligence/create',
+    path: path ?? '/lv/v2/intelligence/create',
     searchParams,
     method: 'POST',
     headers,

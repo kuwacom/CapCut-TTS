@@ -51,6 +51,10 @@ const envSchema = z
     CAPCUT_DEVICE_ID: z.string().min(1).optional(),
     CAPCUT_TDID: z.string().min(1).optional(),
     CAPCUT_VERIFY_FP: z.string().min(1).optional(),
+    CAPCUT_BUNDLE_CONFIG_PATH: z
+      .string()
+      .min(1)
+      .default('capcut-bundle-config.json'),
     CAPCUT_VOICE_CATEGORY_ID: z.coerce.number().int().positive().default(21699),
     CAPCUT_SESSION_STORE_PATH: z
       .string()

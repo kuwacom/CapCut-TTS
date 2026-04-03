@@ -15,6 +15,7 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc -p tsconfig.json && tsc-alias -p tsconfig.json",
     "typecheck": "tsc --noEmit",
+    "capcut:extract": "tsx src/scripts/extractCapCutBundles.ts",
     "lint": "eslint \"src/**/*.ts\" --no-error-on-unmatched-pattern",
     "lint:fix": "npm run lint -- --fix",
     "wintest": "title %npm_config_id% && npm run build && node ./dist/index.js",

@@ -18,7 +18,10 @@ import { getLoginPage } from '@/api/capcut-web/api/getLoginPage';
 import env from '@/configs/env';
 import { CookieJar } from '@/lib/capcut/cookieJar';
 import { capCutConstants } from '@/lib/capcut/constants';
-import { unwrapJsonResponse } from '@/lib/capcut/responseUtils';
+import {
+  CapCutApiError,
+  unwrapJsonResponse,
+} from '@/lib/capcut/responseUtils';
 import {
   parseVoicePreset,
   resolveVoicePreset,
@@ -26,7 +29,12 @@ import {
 } from '@/lib/capcut/voiceUtils';
 import { capCutVoiceCategoryIds } from '@/models/capcutVoiceCategories';
 import { fallbackVoicePresets } from '@/models/capcutVoiceModels';
+import capCutBundleService from '@/services/CapCutBundleService';
 import logger from '@/services/logger';
+import type {
+  CapCutEditorBundleConfig,
+  CapCutLoginBundleConfig,
+} from '@/types/capcutBundle';
 import type {
   AccountInfo,
   LoginResponse,
@@ -50,7 +58,7 @@ import type { PersistedSessionState } from '@/types/capcutSession';
 import {
   buildSensitiveFormBody,
   createDeviceId,
-  createEmailRegionHash,
+  createEmailRegionHashWithSalt,
   createTrackingId,
   createVerifyFp,
   isSessionExpiredError,
@@ -105,6 +113,12 @@ class CapCutService {
 
   private verifyFp = env.CAPCUT_VERIFY_FP ?? createVerifyFp();
 
+  private runtimeLoginBundleConfig: CapCutLoginBundleConfig = {};
+
+  private runtimeEditorBundleConfig: CapCutEditorBundleConfig = {
+    sourceUrls: [],
+  };
+
   constructor() {
     this.restorePromise = this.restorePersistedSession();
   }
@@ -155,8 +169,10 @@ class CapCutService {
    * 起動時の事前ウォームアップ
    */
   async warmup() {
+    await this.refreshLoginBundleConfig();
     await this.ensureAuthenticated();
     await this.loadVoices();
+    void this.refreshEditorBundleConfig();
   }
 
   /**
@@ -198,6 +214,221 @@ class CapCutService {
     });
 
     return this.sessionPromise;
+  }
+
+  /**
+   * login bundle 由来の設定を更新する
+   */
+  private async refreshLoginBundleConfig() {
+    this.runtimeLoginBundleConfig =
+      await capCutBundleService.resolveLoginBundleConfig();
+  }
+
+  /**
+   * editor bundle 由来の設定を更新する
+   */
+  private async refreshEditorBundleConfig() {
+    this.runtimeEditorBundleConfig =
+      await capCutBundleService.resolveEditorBundleConfig(
+        this.fetchWithCookies.bind(this)
+      );
+  }
+
+  /**
+   * bundle 由来 login sdk version を返す
+   */
+  private getResolvedLoginSdkVersion() {
+    return isSemverLike(this.runtimeLoginBundleConfig.sdkVersion)
+      ? this.runtimeLoginBundleConfig.sdkVersion
+      : loginSdkVersion;
+  }
+
+  /**
+   * bundle 由来 login email path を返す
+   */
+  private getResolvedEmailLoginPath() {
+    return this.runtimeLoginBundleConfig.emailLoginPath ?? '/passport/web/email/login/';
+  }
+
+  /**
+   * bundle 由来 login user path を返す
+   */
+  private getResolvedUserLoginPath() {
+    return this.runtimeLoginBundleConfig.userLoginPath ?? '/passport/web/user/login/';
+  }
+
+  /**
+   * bundle 由来 region path を返す
+   */
+  private getResolvedRegionPath() {
+    return this.runtimeLoginBundleConfig.regionPath ?? '/passport/web/region/';
+  }
+
+  /**
+   * bundle 由来 account info path を返す
+   */
+  private getResolvedAccountInfoPath() {
+    return this.runtimeLoginBundleConfig.accountInfoPath ?? '/passport/web/account/info/';
+  }
+
+  /**
+   * bundle 由来 editor app version を返す
+   */
+  private getResolvedEditorAppVersion() {
+    return isSemverLike(this.runtimeEditorBundleConfig.editorAppVersion)
+      ? this.runtimeEditorBundleConfig.editorAppVersion
+      : editorAppVersion;
+  }
+
+  /**
+   * bundle 由来 web app version を返す
+   */
+  private getResolvedWebAppVersion() {
+    return isSemverLike(this.runtimeEditorBundleConfig.webAppVersion)
+      ? this.runtimeEditorBundleConfig.webAppVersion
+      : webAppVersion;
+  }
+
+  /**
+   * bundle 由来 version_name を返す
+   */
+  private getResolvedVersionName() {
+    return isSemverLike(this.runtimeEditorBundleConfig.versionName)
+      ? this.runtimeEditorBundleConfig.versionName
+      : '11.0.0';
+  }
+
+  /**
+   * bundle 由来 version_code を返す
+   */
+  private getResolvedVersionCode() {
+    return isSemverLike(this.runtimeEditorBundleConfig.versionCode)
+      ? this.runtimeEditorBundleConfig.versionCode
+      : '11.0.0';
+  }
+
+  /**
+   * bundle 由来 sdk_version を返す
+   */
+  private getResolvedSdkVersion() {
+    return isSemverLike(this.runtimeEditorBundleConfig.sdkVersion)
+      ? this.runtimeEditorBundleConfig.sdkVersion
+      : '19.3.0';
+  }
+
+  /**
+   * bundle 由来 effect_sdk_version を返す
+   */
+  private getResolvedEffectSdkVersion() {
+    return isSemverLike(this.runtimeEditorBundleConfig.effectSdkVersion)
+      ? this.runtimeEditorBundleConfig.effectSdkVersion
+      : '19.3.0';
+  }
+
+  /**
+   * bundle 由来 voice panel を返す
+   */
+  private getResolvedVoicePanel() {
+    return this.runtimeEditorBundleConfig.voicePanel ?? voicePanel;
+  }
+
+  /**
+   * bundle 由来 voice panel source を返す
+   */
+  private getResolvedVoicePanelSource() {
+    return this.runtimeEditorBundleConfig.voicePanelSource ?? voicePanelSource;
+  }
+
+  /**
+   * bundle 由来の voice category ids を返す
+   */
+  private getResolvedVoiceCategoryIds() {
+    return this.runtimeEditorBundleConfig.voiceCategoryIds?.length
+      ? this.runtimeEditorBundleConfig.voiceCategoryIds
+      : capCutVoiceCategoryIds;
+  }
+
+  /**
+   * bundle 由来 voice list path を返す
+   */
+  private getResolvedVoiceListPath() {
+    return (
+      this.runtimeEditorBundleConfig.voiceListPath ??
+      '/artist/v1/effect/get_resources_by_category_id'
+    );
+  }
+
+  /**
+   * bundle 由来 workspace path を返す
+   */
+  private getResolvedWorkspacePath() {
+    return (
+      this.runtimeEditorBundleConfig.workspacePath ??
+      '/cc/v1/workspace/get_user_workspaces'
+    );
+  }
+
+  /**
+   * bundle 由来 multi_platform path を返す
+   */
+  private getResolvedMultiPlatformPath() {
+    const extractedPath = this.runtimeEditorBundleConfig.multiPlatformPath;
+    if (!extractedPath) {
+      return '/storyboard/v1/tts/multi_platform';
+    }
+
+    return extractedPath.startsWith('/storyboard/')
+      ? extractedPath
+      : '/storyboard/v1/tts/multi_platform';
+  }
+
+  /**
+   * bundle 由来 create task path を返す
+   */
+  private getResolvedCreateTaskPath() {
+    const extractedPath = this.runtimeEditorBundleConfig.createTaskPath;
+    if (!extractedPath) {
+      return '/lv/v2/intelligence/create';
+    }
+
+    return extractedPath.startsWith('/lv/')
+      ? extractedPath
+      : `/lv/v2${extractedPath}`;
+  }
+
+  /**
+   * bundle 由来 query task path を返す
+   */
+  private getResolvedQueryTaskPath() {
+    const extractedPath = this.runtimeEditorBundleConfig.queryTaskPath;
+    if (!extractedPath) {
+      return '/lv/v2/intelligence/query';
+    }
+
+    return extractedPath.startsWith('/lv/')
+      ? extractedPath
+      : `/lv/v2${extractedPath}`;
+  }
+
+  /**
+   * bundle 由来 sign recipe を返す
+   */
+  private getResolvedSignRecipe() {
+    return this.runtimeEditorBundleConfig.signRecipe;
+  }
+
+  /**
+   * bundle 由来 platform id を返す
+   */
+  private getResolvedPlatformId() {
+    return this.runtimeEditorBundleConfig.signRecipe?.platformId ?? platformId;
+  }
+
+  /**
+   * bundle 由来 sign version を返す
+   */
+  private getResolvedSignVersion() {
+    return this.runtimeEditorBundleConfig.signRecipe?.signVersion ?? signVersion;
   }
 
   /**
@@ -300,6 +531,7 @@ class CapCutService {
     this.cookieJar.clear();
     this.seedPassportCookies();
     this.verifyFp = env.CAPCUT_VERIFY_FP ?? createVerifyFp();
+    await this.refreshLoginBundleConfig();
     await this.primeCookies();
 
     const resolvedRegion = await this.resolveLoginRegion().catch((error) => {
@@ -357,6 +589,7 @@ class CapCutService {
 
         this.session = session;
         await this.persistSession();
+        void this.refreshEditorBundleConfig();
         logger.info('CapCut session established', {
           userId: session.userId,
           workspaceId: session.workspaceId,
@@ -366,6 +599,10 @@ class CapCutService {
       } catch (error) {
         lastError = error;
         logger.warn(`CapCut login via ${loginHost} failed`, { error });
+
+        if (!shouldTryOtherLoginHost(error)) {
+          break;
+        }
       }
     }
 
@@ -415,7 +652,7 @@ class CapCutService {
         searchParams: {
           aid: appId,
           account_sdk_source: 'web',
-          sdk_version: loginSdkVersion,
+          sdk_version: this.getResolvedLoginSdkVersion(),
           language: env.CAPCUT_LOCALE,
           verifyFp: this.verifyFp,
         },
@@ -451,10 +688,11 @@ class CapCutService {
     const response = await resolveRegion({
       requester: this.fetchWithCookies.bind(this),
       host: env.CAPCUT_LOGIN_HOST,
+      path: this.getResolvedRegionPath(),
       searchParams: {
         aid: appId,
         account_sdk_source: 'web',
-        sdk_version: loginSdkVersion,
+        sdk_version: this.getResolvedLoginSdkVersion(),
         language: env.CAPCUT_LOCALE,
         verifyFp: this.verifyFp,
         mix_mode: '1',
@@ -473,7 +711,10 @@ class CapCutService {
       },
       body: new URLSearchParams({
         type: '2',
-        hashed_id: createEmailRegionHash(env.CAPCUT_EMAIL),
+        hashed_id: createEmailRegionHashWithSalt(
+          env.CAPCUT_EMAIL,
+          this.runtimeLoginBundleConfig.emailHashSalt
+        ),
       }).toString(),
     });
 
@@ -485,13 +726,13 @@ class CapCutService {
 
   /**
    * email/password ログインを実行する
-   * まず email/login を試し、失敗時だけ user/login へフォールバックする
+   * まず email/login を試し、endpoint 不整合らしい場合だけ user/login へフォールバックする
    */
   private async loginWithHost(loginHost: string): Promise<LoginResponse> {
     const searchParams = {
       aid: appId,
       account_sdk_source: 'web',
-      sdk_version: loginSdkVersion,
+      sdk_version: this.getResolvedLoginSdkVersion(),
       language: env.CAPCUT_LOCALE,
       verifyFp: this.verifyFp,
     };
@@ -520,6 +761,7 @@ class CapCutService {
         await emailLogin({
           requester: this.fetchWithCookies.bind(this),
           host: loginHost,
+          path: this.getResolvedEmailLoginPath(),
           searchParams,
           headers,
           body,
@@ -527,11 +769,16 @@ class CapCutService {
         'CapCut passport /passport/web/email/login/'
       );
     } catch (error) {
+      if (!shouldFallbackToUserLogin(error)) {
+        throw error;
+      }
+
       logger.info('CapCut email/login fallback to user/login', { error });
       return unwrapJsonResponse<LoginResponse>(
         await userLogin({
           requester: this.fetchWithCookies.bind(this),
           host: loginHost,
+          path: this.getResolvedUserLoginPath(),
           searchParams,
           headers,
           body,
@@ -548,10 +795,11 @@ class CapCutService {
     return unwrapJsonResponse<AccountInfo>(
       await getAccountInfo({
         requester: this.fetchWithCookies.bind(this),
+        path: this.getResolvedAccountInfoPath(),
         searchParams: {
           aid: appId,
           account_sdk_source: 'web',
-          sdk_version: loginSdkVersion,
+          sdk_version: this.getResolvedLoginSdkVersion(),
           language: env.CAPCUT_LOCALE,
           verifyFp: this.verifyFp,
         },
@@ -577,8 +825,8 @@ class CapCutService {
    */
   private async fetchPrimaryWorkspace(): Promise<WorkspaceInfo> {
     const data = await this.requestSignedEditJson<WorkspaceListResponse>({
-      path: '/cc/v1/workspace/get_user_workspaces',
-      appVersion: webAppVersion,
+      path: this.getResolvedWorkspacePath(),
+      appVersion: this.getResolvedWebAppVersion(),
       extraHeaders: {
         lan: env.CAPCUT_LOCALE,
         loc: 'sg',
@@ -591,6 +839,7 @@ class CapCutService {
       request: ({ headers, body }) =>
         getUserWorkspaces({
           requester: this.fetchWithCookies.bind(this),
+          path: this.getResolvedWorkspacePath(),
           headers,
           body,
         }),
@@ -640,16 +889,17 @@ class CapCutService {
    */
   private async requestVoiceList(): Promise<VoicePreset[]> {
     const voiceResponses = await Promise.allSettled(
-      capCutVoiceCategoryIds.map(async (categoryId) => {
+      this.getResolvedVoiceCategoryIds().map(async (categoryId) => {
         const payload = await unwrapJsonResponse<VoiceListResponse>(
           await getVoiceModels({
             requester: this.fetchWithCookies.bind(this),
+            path: this.getResolvedVoiceListPath(),
             searchParams: {
               aid: appId,
-              version_name: '19.3.0',
-              version_code: '11.0.0',
-              sdk_version: '19.3.0',
-              effect_sdk_version: '19.3.0',
+              version_name: this.getResolvedVersionName(),
+              version_code: this.getResolvedVersionCode(),
+              sdk_version: this.getResolvedSdkVersion(),
+              effect_sdk_version: this.getResolvedEffectSdkVersion(),
               device_platform: 'web',
               region: env.CAPCUT_REGION,
               language: env.CAPCUT_LOCALE,
@@ -668,10 +918,10 @@ class CapCutService {
               'store-country-code-src': 'uid',
             },
             body: JSON.stringify({
-              panel: voicePanel,
+              panel: this.getResolvedVoicePanel(),
               category_id: categoryId,
               category_key: String(categoryId),
-              panel_source: voicePanelSource,
+              panel_source: this.getResolvedVoicePanelSource(),
               pack_optional: {
                 need_tag: true,
                 need_thumb: true,
@@ -795,8 +1045,8 @@ class CapCutService {
     options: SynthesizeOptions
   ): Promise<Response> {
     const ttsData = await this.requestSignedEditJson<MultiPlatformTtsResponse>({
-      path: '/storyboard/v1/tts/multi_platform',
-      appVersion: editorAppVersion,
+      path: this.getResolvedMultiPlatformPath(),
+      appVersion: this.getResolvedEditorAppVersion(),
       tdid: this.tdid,
       body: {
         texts: [options.text],
@@ -815,6 +1065,7 @@ class CapCutService {
       request: ({ headers, body }) =>
         createMultiPlatformTts({
           requester: this.fetchWithCookies.bind(this),
+          path: this.getResolvedMultiPlatformPath(),
           headers,
           body,
         }),
@@ -838,8 +1089,8 @@ class CapCutService {
     options: SynthesizeOptions
   ) {
     const data = await this.requestSignedEditJson<TtsTaskResponse>({
-      path: '/lv/v2/intelligence/create',
-      appVersion: editorAppVersion,
+      path: this.getResolvedCreateTaskPath(),
+      appVersion: this.getResolvedEditorAppVersion(),
       extraHeaders: {
         lan: env.CAPCUT_LOCALE,
       },
@@ -871,6 +1122,7 @@ class CapCutService {
       request: ({ searchParams, headers, body }) =>
         createTtsTask({
           requester: this.fetchWithCookies.bind(this),
+          path: this.getResolvedCreateTaskPath(),
           searchParams,
           headers,
           body,
@@ -894,8 +1146,8 @@ class CapCutService {
   ): Promise<TtsTaskDetail> {
     for (let attempt = 0; attempt < ttsMaxPollAttempts; attempt += 1) {
       const data = await this.requestSignedEditJson<TtsQueryResponse>({
-        path: '/lv/v2/intelligence/query',
-        appVersion: editorAppVersion,
+        path: this.getResolvedQueryTaskPath(),
+        appVersion: this.getResolvedEditorAppVersion(),
         extraHeaders: {
           lan: env.CAPCUT_LOCALE,
         },
@@ -913,6 +1165,7 @@ class CapCutService {
         request: ({ searchParams, headers, body }) =>
           queryTtsTask({
             requester: this.fetchWithCookies.bind(this),
+            path: this.getResolvedQueryTaskPath(),
             searchParams,
             headers,
             body,
@@ -978,6 +1231,10 @@ class CapCutService {
     }) => Promise<Response>;
     context: string;
   }) {
+    if (this.runtimeEditorBundleConfig.sourceUrls.length === 0) {
+      await this.refreshEditorBundleConfig();
+    }
+
     const searchParams = options.searchParams ?? {};
     const targetUrl = new URL(options.path, env.CAPCUT_EDIT_API_URL);
 
@@ -988,9 +1245,10 @@ class CapCutService {
     const tdid = options.tdid ?? '';
     const { sign, deviceTime } = createEditApiSignature(
       targetUrl.toString(),
-      platformId,
+      this.getResolvedPlatformId(),
       options.appVersion,
-      tdid
+      tdid,
+      this.getResolvedSignRecipe()
     );
 
     return unwrapJsonResponse<T>(
@@ -1006,9 +1264,9 @@ class CapCutService {
           appvr: options.appVersion,
           'device-time': deviceTime,
           did: this.deviceId,
-          pf: platformId,
+          pf: this.getResolvedPlatformId(),
           sign,
-          'sign-ver': signVersion,
+          'sign-ver': this.getResolvedSignVersion(),
           'store-country-code': env.CAPCUT_STORE_COUNTRY_CODE,
           'store-country-code-src': 'uid',
           tdid,
@@ -1123,6 +1381,24 @@ const normalizeStringId = (value: unknown) =>
   typeof value === 'bigint'
     ? String(value)
     : null;
+
+/**
+ * email/login 失敗時に user/login へフォールバックしてよいかを判定する
+ * CapCut の業務エラー時は user/login へ進むと別のエラーで上書きされやすい
+ */
+const shouldFallbackToUserLogin = (error: unknown) =>
+  error instanceof CapCutApiError &&
+  (error.statusCode === 404 || error.statusCode === 405);
+
+/**
+ * 別 login host へ再試行してよいかを判定する
+ * error_code が返っている時は host を変えても改善しにくいため、その場で止める
+ */
+const shouldTryOtherLoginHost = (error: unknown) =>
+  !(error instanceof CapCutApiError && error.errorCode !== undefined);
+
+const isSemverLike = (value: string | undefined): value is string =>
+  typeof value === 'string' && /^\d+\.\d+\.\d+(?:-[A-Za-z0-9._-]+)?$/.test(value);
 
 /**
  * デバッグログ用に秘匿ヘッダーを伏せる

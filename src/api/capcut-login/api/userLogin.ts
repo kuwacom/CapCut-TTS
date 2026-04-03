@@ -4,6 +4,7 @@ import type { ApiRequester } from '@/types/api';
 interface UserLoginParams {
   requester: ApiRequester;
   host: string;
+  path?: string;
   searchParams: Record<string, string>;
   headers: HeadersInit;
   body: BodyInit;
@@ -15,6 +16,6 @@ interface UserLoginParams {
 export const userLogin = (params: UserLoginParams) =>
   CapCutLoginApiClient.request({
     ...params,
-    path: '/passport/web/user/login/',
+    path: params.path ?? '/passport/web/user/login/',
     method: 'POST',
   });

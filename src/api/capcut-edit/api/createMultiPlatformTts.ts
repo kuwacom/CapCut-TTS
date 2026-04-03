@@ -3,6 +3,7 @@ import type { ApiRequester } from '@/types/api';
 
 interface CreateMultiPlatformTtsParams {
   requester: ApiRequester;
+  path?: string;
   headers: HeadersInit;
   body: BodyInit;
 }
@@ -12,12 +13,13 @@ interface CreateMultiPlatformTtsParams {
  */
 export const createMultiPlatformTts = ({
   requester,
+  path,
   headers,
   body,
 }: CreateMultiPlatformTtsParams) =>
   CapCutEditApiClient.request({
     requester,
-    path: '/storyboard/v1/tts/multi_platform',
+    path: path ?? '/storyboard/v1/tts/multi_platform',
     method: 'POST',
     headers,
     body,

@@ -28,11 +28,19 @@ export const createEditApiSignature = (
   requestUrl: string,
   platformId: string,
   appVersion: string,
-  tdid = ''
+  tdid = '',
+  recipe: Partial<{
+    prefix: string;
+    suffix: string;
+    pathTailLength: number;
+  }> = {}
 ) => {
   const url = new URL(requestUrl);
+  const prefix = recipe.prefix ?? '9e2c';
+  const suffix = recipe.suffix ?? '11ac';
+  const pathTailLength = recipe.pathTailLength ?? 7;
   const deviceTime = Math.floor(Date.now() / 1000).toString();
-  const raw = `9e2c|${url.pathname.slice(-7)}|${platformId}|${appVersion}|${deviceTime}|${tdid}|11ac`;
+  const raw = `${prefix}|${url.pathname.slice(-pathTailLength)}|${platformId}|${appVersion}|${deviceTime}|${tdid}|${suffix}`;
 
   return {
     sign: crypto.createHash('md5').update(raw).digest('hex').toLowerCase(),

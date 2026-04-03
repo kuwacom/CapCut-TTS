@@ -1,0 +1,64 @@
+{
+  "discoveredAt": 1774851234489,
+  "login": {
+    "accountBundleUrl": "https://sf16-web-login-neutral.capcutstatic.com/obj/capcut-web-login-static/ies/lvweb/platform_online/static/js/async/npm.byted-sdk.account-api.81062b56.js",
+    "sdkVersion": "2.1.10-tiktok",
+    "xorKey": 5,
+    "supportsVerifyFp": true,
+    "emailLoginPath": "/passport/web/email/login/",
+    "userLoginPath": "/passport/web/user/login/",
+    "accountInfoPath": "/passport/web/account/info/"
+  },
+  "editor": {
+    "sourceUrls": [
+      "https://sf16-web-login-neutral.capcutstatic.com/obj/capcut-web-login-static/ies/lvweb/platform_online/static/js/async/48427.60a31ed6.js",
+      "https://sf16-web-login-neutral.capcutstatic.com/obj/capcut-web-login-static/ies/lvweb/video_online/static/js/services-3015f62a.af291ee0.js",
+      "https://sf16-web-login-neutral.capcutstatic.com/obj/capcut-web-login-static/ies/lvweb/video_online/static/js/editor.d740c267.js",
+      "https://sf16-web-login-neutral.capcutstatic.com/obj/capcut-web-login-static/ies/lvweb/video_online/static/js/editor-template.2c7d4013.js",
+      "https://sf16-web-login-neutral.capcutstatic.com/obj/capcut-web-login-static/ies/lvweb/video_online/static/js/services-1.2ced44c5.js",
+      "https://sf16-web-login-neutral.capcutstatic.com/obj/capcut-web-login-static/ies/lvweb/video_online/static/js/vendors-5.0bd5a122.js",
+      "https://sf16-web-login-neutral.capcutstatic.com/obj/capcut-web-login-static/ies/lvweb/smart_tools_online/static/js/tts-components-chunk.05450f2e.js",
+      "https://sf16-web-login-neutral.capcutstatic.com/obj/capcut-web-login-static/ies/lvweb/smart_tools_online/static/js/tts-initial-vendors-0.5a148805.js",
+      "https://sf16-web-login-neutral.capcutstatic.com/obj/capcut-web-login-static/ies/lvweb/smart_tools_online/static/js/tts-initial-vendors-1.b253706f.js",
+      "https://sf16-web-login-neutral.capcutstatic.com/obj/capcut-web-login-static/ies/lvweb/smart_tools_online/static/js/tts-initial-vendors-2.fb8250f6.js",
+      "https://sf16-web-login-neutral.capcutstatic.com/obj/capcut-web-login-static/ies/lvweb/smart_tools_online/static/js/tts-initial-vendors-93ec8a27.75fbaaa7.js",
+      "https://sf16-web-login-neutral.capcutstatic.com/obj/capcut-web-login-static/ies/lvweb/smart_tools_online/static/js/tts-initial-vendors-123287ed.aa755491.js",
+      "https://sf16-web-login-neutral.capcutstatic.com/obj/capcut-web-login-static/ies/lvweb/smart_tools_online/static/js/tts-initial-vendors-0f0ea577.9121c962.js",
+      "https://sf16-web-login-neutral.capcutstatic.com/obj/capcut-web-login-static/ies/lvweb/smart_tools_online/static/js/tts-initial-vendors-6.51764f88.js",
+      "https://sf16-web-login-neutral.capcutstatic.com/obj/capcut-web-login-static/ies/lvweb/smart_tools_online/static/js/tts-initial-vendors-7.6956eaa6.js",
+      "https://sf16-web-login-neutral.capcutstatic.com/obj/capcut-web-login-static/ies/lvweb/smart_tools_online/static/js/tts-initial-vendors-5460dd04.248b91fa.js",
+      "https://sf16-web-login-neutral.capcutstatic.com/obj/capcut-web-login-static/ies/lvweb/smart_tools_online/static/js/tts-initial-lib-0.091c25b7.js",
+      "https://sf16-web-login-neutral.capcutstatic.com/obj/capcut-web-login-static/ies/lvweb/smart_tools_online/static/js/tts-initial-lib-1.4ddef69d.js",
+      "https://sf16-web-login-neutral.capcutstatic.com/obj/capcut-web-login-static/ies/lvweb/smart_tools_online/static/js/tts-initial-package-0.3e2f4821.js",
+      "https://sf16-web-login-neutral.capcutstatic.com/obj/capcut-web-login-static/ies/lvweb/smart_tools_online/static/js/tts-initial-package-1.244cda05.js",
+      "https://sf16-web-login-neutral.capcutstatic.com/obj/capcut-web-login-static/ies/lvweb/smart_tools_online/static/js/tts.5f835380.js"
+    ],
+    "editorAppVersion": "8.4.0",
+    "webAppVersion": "5.8.0",
+    "versionName": "11.0.0",
+    "versionCode": "11.0.0",
+    "signRecipe": {
+      "prefix": "9e2c",
+      "suffix": "11ac",
+      "pathTailLength": 7,
+      "platformId": "7",
+      "tdidDefault": "web"
+    },
+    "createTaskPath": "/intelligence/create",
+    "queryTaskPath": "/intelligence/query",
+    "workspacePath": "/cc/v1/workspace/get_user_workspaces",
+    "voiceListPath": "/artist/v1/effect/get_resources_by_category_id",
+    "homepageEffectListPath": "/artist/v1/homepage/get_effect_list",
+    "voicePanel": "tone",
+    "voicePanelSource": "heycan",
+    "voiceCategoryIds": [
+      2037709985,
+      2037709986,
+      2037710049,
+      2037710051,
+      2037710052,
+      2037710055,
+      2037710056
+    ]
+  }
+}

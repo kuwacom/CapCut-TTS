@@ -5,6 +5,7 @@ dist/
 # env
 .env
 capcut-session.json
+capcut-bundle-config.json
 
 # vscode
 .vscode/

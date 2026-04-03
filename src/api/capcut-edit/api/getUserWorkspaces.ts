@@ -3,6 +3,7 @@ import type { ApiRequester } from '@/types/api';
 
 interface GetUserWorkspacesParams {
   requester: ApiRequester;
+  path?: string;
   headers: HeadersInit;
   body: BodyInit;
 }
@@ -12,12 +13,13 @@ interface GetUserWorkspacesParams {
  */
 export const getUserWorkspaces = ({
   requester,
+  path,
   headers,
   body,
 }: GetUserWorkspacesParams) =>
   CapCutEditApiClient.request({
     requester,
-    path: '/cc/v1/workspace/get_user_workspaces',
+    path: path ?? '/cc/v1/workspace/get_user_workspaces',
     method: 'POST',
     headers,
     body,

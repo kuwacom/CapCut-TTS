@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 
-const capCutEmailHashSalt = 'aDy0TUhtql92P7hScCs97YWMT-jub2q9';
+const defaultCapCutEmailHashSalt = 'aDy0TUhtql92P7hScCs97YWMT-jub2q9';
 
 /**
  * CapCut の verifyFp 形式に寄せた識別子を生成する
@@ -71,7 +71,15 @@ export const normalizeEmailForRegion = (email: string) =>
  * region 解決用の hashed_id を生成する
  */
 export const createEmailRegionHash = (email: string) =>
-  sha256Hex(`${normalizeEmailForRegion(email)}${capCutEmailHashSalt}`);
+  sha256Hex(`${normalizeEmailForRegion(email)}${defaultCapCutEmailHashSalt}`);
+
+/**
+ * region 解決用の hashed_id を任意 salt で生成する
+ */
+export const createEmailRegionHashWithSalt = (
+  email: string,
+  salt = defaultCapCutEmailHashSalt
+) => sha256Hex(`${normalizeEmailForRegion(email)}${salt}`);
 
 /**
  * 秘匿項目だけ XOR5 + hex で包んだ form body を作る

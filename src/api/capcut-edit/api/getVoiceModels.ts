@@ -3,6 +3,7 @@ import type { ApiRequester } from '@/types/api';
 
 interface GetVoiceModelsParams {
   requester: ApiRequester;
+  path?: string;
   searchParams: Record<string, string>;
   headers: HeadersInit;
   body: BodyInit;
@@ -13,13 +14,14 @@ interface GetVoiceModelsParams {
  */
 export const getVoiceModels = ({
   requester,
+  path,
   searchParams,
   headers,
   body,
 }: GetVoiceModelsParams) =>
   CapCutEditApiClient.request({
     requester,
-    path: '/artist/v1/effect/get_resources_by_category_id',
+    path: path ?? '/artist/v1/effect/get_resources_by_category_id',
     searchParams,
     method: 'POST',
     headers,

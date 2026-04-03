@@ -22,6 +22,7 @@
 - TTS 実行は少なくとも 2 系統あり、現在は `storyboard/v1/tts/multi_platform` がもっとも素直
 - editor 上の別系統として `lv/v2/intelligence/create` → `lv/v2/intelligence/query` も使われている
 - 旧実装の `common/tts/token + sami websocket` は、今回では主経路として使われていない
+- bundle 由来の設定値は HAR または live アクセスから抽出し、`capcut-bundle-config.json` に保存して再利用できる
 
 ## 実装スタックの見取り図
 
@@ -68,6 +69,14 @@
   TTS 実行フロー、音声カテゴリ、モデル取得、`type` 互換の考え方
 
 ## 調査時点の重要な結論
+
+### bundle 設定キャッシュ
+
+- `capcut-bundle-config.json` は、CapCut Web の bundle から抽出した設定値の保存先
+- 保存対象は endpoint path、version、sign recipe、音声カテゴリ ID など
+- キャッシュが有効な間は、毎回 CapCut のページへアクセスして bundle を再取得しなくてもよい
+- キャッシュファイルが存在しない場合や期限切れの場合は、live で bundle を再取得して更新する
+- `npm run capcut:extract` は HAR からこのファイルを作る補助手段であり、通常運用の必須要件ではない
 
 ### 認証
 
