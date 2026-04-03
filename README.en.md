@@ -2,21 +2,23 @@
 
 [日本語 README](./README.md)
 
-A self-hosted wrapper API that makes CapCut TTS easier to use through a simple HTTP interface.
+A self-hosted wrapper API for logging in to CapCut Web with email / password, keeping the session alive, and fetching audio through the latest Web TTS flow
 
-With this project, you can keep CapCut-side token refresh logic on the server and fetch generated audio through `GET /v1/synthesize`.
+Instead of the old `token + websocket` approach, this project follows the current CapCut Web authentication flow and `storyboard/v1/tts/multi_platform`
 
-## What You Can Do
+## Features
 
-- Use CapCut TTS through a simple HTTP API
-- Choose between `buffer` and `stream` response modes
-- Automatically fetch and refresh tokens
-- Run and maintain the server with a TypeScript + Express 5 codebase
+- Log in to CapCut Web with email / password and keep the session alive
+- Fetch MP3 audio through `GET /v1/synthesize`
+- Fetch WAV audio through the old token + websocket flow via `GET /legacy/synthesize`
+- Support both `buffer` and `stream` response modes
+- Save and reuse the session in `capcut-session.json`
+- Save and reuse bundle-derived runtime settings in `capcut-bundle-config.json`
 
 ## Notes
 
 - This project is not an official CapCut SDK or official API wrapper
-- It may stop working at any time if CapCut changes its internal behavior
+- It may stop working at any time if CapCut changes its internal implementation
 - Please decide how to publish and operate it at your own risk
 
 ## Quick Start
@@ -29,26 +31,20 @@ npm install
 
 ### 2. Create `.env`
 
-macOS / Linux:
-
 ```bash
 cp .env.example .env
 ```
 
-Windows PowerShell:
+### 3. Set CapCut credentials
 
-```powershell
-Copy-Item .env.example .env
-```
-
-### 3. Set `DEVICE_TIME` and `SIGN`
-
-At minimum, add these two values to `.env`:
+At minimum, configure the following two values
 
 ```env
-DEVICE_TIME=
-SIGN=
+CAPCUT_EMAIL=your-account@example.com
+CAPCUT_PASSWORD=your-password
 ```
+
+The default values are usually enough for everything else
 
 ### 4. Start the development server
 
@@ -56,48 +52,67 @@ SIGN=
 npm run dev
 ```
 
-Default listen address:
-
-- `http://0.0.0.0:8080`
-- Example access URL from a client: `http://localhost:8080`
-
 ### 5. Call the API
 
 ```bash
-curl "http://localhost:8080/v1/synthesize?text=Hello&type=0&pitch=10&speed=10&volume=10&method=buffer" --output voice.wav
+curl "http://localhost:8080/v1/synthesize?text=Hello&type=0&method=buffer" --output voice.mp3
 ```
 
-## How to Get `DEVICE_TIME` and `SIGN`
+If you want to use the old flow, configure `LEGACY_DEVICE_TIME` and `LEGACY_SIGN` and call:
 
-You need to extract these values from your browser DevTools while logged in to CapCut.
+```bash
+curl "http://localhost:8080/legacy/synthesize?text=Hello&type=0&pitch=10&speed=10&volume=10&method=buffer" --output voice.wav
+```
 
-### Steps
+## How Bundle Config Works
 
-1. Log in to CapCut and create a new empty project
-2. Add any text and open the text-to-speech tab
-3. Open DevTools, go to Network, and click `Clear Network log`
-4. Generate speech with any voice
-5. Find the `POST` request related to `token`
-6. Copy `Device-Time` and `Sign` from the request headers into `.env`
+This project stores settings discovered from CapCut Web bundles in `capcut-bundle-config.json`.
 
-If there are too many requests, filtering the Network tab with `token` usually helps.
+That file can contain values such as:
 
-### Reference Images
+- login and account endpoint paths
+- editor and TTS endpoint paths
+- version-related values such as `appvr`, `version_name`, and `sdk_version`
+- the sign recipe used for edit API requests
+- discovered voice category ids
 
-CapCut screen where TTS is generated:
+`capcut-bundle-config.json` is effectively a cache of bundle information fetched from real CapCut pages. If the file already exists and its contents are still within the cache window, the server does not need to re-fetch bundle pages every time.
 
-![CapCut TTS screen](./images/1.png)
+The service will try live extraction again when:
 
-Example of finding the target request in Network:
+- `capcut-bundle-config.json` does not exist yet
+- the cache has expired
+- the current cached values are not sufficient
 
-![CapCut Network log](./images/2.png)
+This means HAR files are not required for normal operation. As long as the server can access CapCut pages, it can discover bundle settings dynamically, save them to `capcut-bundle-config.json`, and reuse them on later runs.
+
+## HAR and `capcut:extract`
+
+`npm run capcut:extract` is an optional helper command that generates `capcut-bundle-config.json` from HAR files.
+
+```bash
+npm run capcut:extract
+```
+
+This command is not required for normal runtime. It is mainly useful when you want to:
+
+- preload known bundle values from HAR before the first startup
+- prepare bundle settings without relying on live page access first
+- investigate CapCut changes offline
+
+The current implementation does not rely on blindly hardcoded constants. Instead, it prefers values discovered from one of these sources and stores them in `capcut-bundle-config.json`:
+
+- values extracted from HAR files
+- values extracted live from real CapCut pages
+
+In other words, the operating model is: reuse saved bundle settings first, and refresh them only when needed.
 
 ## API
 
 ### Base URL
 
 ```text
-http://<host>:<port>/v1/
+http://<host>:<port>/
 ```
 
 ### Endpoint
@@ -106,111 +121,105 @@ http://<host>:<port>/v1/
 GET /v1/synthesize
 ```
 
+```http
+GET /legacy/synthesize
+```
+
 ### Query Parameters
 
 | Parameter | Type | Required | Description | Default |
 | --- | --- | --- | --- | --- |
-| `text` | string | Yes | Text to synthesize | None |
-| `type` | number | No | Voice type | `0` |
-| `pitch` | number | No | Pitch | `10` |
-| `speed` | number | No | Speed | `10` |
-| `volume` | number | No | Volume | `10` |
+| `text` | string | Yes | Text to read aloud | None |
+| `type` | number | No | Compatibility voice index | `0` |
+| `voice` | string | No | Explicit voice selector. Accepts alias / `effectId` / `resourceId` / `speaker` | None |
+| `pitch` | number | No | Legacy compatibility parameter. Currently unused by the Web TTS flow | `10` |
+| `speed` | number | No | Playback speed. `10` means normal speed | `10` |
+| `volume` | number | No | Volume. `10` means standard level | `10` |
 | `method` | string | No | `buffer` or `stream` | `buffer` |
-
-### Request Example
-
-```http
-GET http://localhost:8080/v1/synthesize?text=Hello&type=0&pitch=10&speed=10&volume=10&method=buffer
-```
 
 ### Responses
 
 | Status Code | Description |
 | --- | --- |
-| `200 OK` | Returns `audio/wav` |
-| `400 Bad Request` | Invalid query parameters |
-| `502 Bad Gateway` | CapCut-side synthesis failed |
-| `503 Service Unavailable` | Token is not ready yet |
+| `200 OK` | `audio/mpeg` |
+| `400 Bad Request` | Invalid query |
+| `502 Bad Gateway` | Authentication or synthesis failed on the CapCut side |
 
-With `method=buffer`, the whole audio file is returned at once.  
-With `method=stream`, audio data is returned progressively as a stream.
+`/legacy/synthesize` uses the old token + websocket flow and returns `audio/wav`.
+If `LEGACY_DEVICE_TIME` and `LEGACY_SIGN` are not configured, it returns `503 Service Unavailable`.
 
-See [openapi.yaml](./openapi.yaml) for the OpenAPI definition.
+## Voice Compatibility Table For `type`
 
-## Voice Type List
+`type` maps to the fixed voices below. When using `voice`, you can pass the value from the `alias` column
 
-| type | Voice name | Speaker ID |
+For voices outside this table, refer to `/v1/models`
+
+| type | alias | voice |
 | --- | --- | --- |
-| 0 | Mystery Boy 1 | `BV525_streaming` |
-| 1 | Mystery Kid | `BV528_streaming` |
-| 2 | Cute Voice | `BV017_streaming` |
-| 3 | Lady / Sister | `BV016_streaming` |
-| 4 | Young Girl | `BV023_streaming` |
-| 5 | Girl | `BV024_streaming` |
-| 6 | Boy 2 | `BV018_streaming` |
-| 7 | Young Master | `BV523_streaming` |
-| 8 | Girl | `BV521_streaming` |
-| 9 | Female Announcer | `BV522_streaming` |
-| 10 | Male Announcer | `BV524_streaming` |
-| 11 | Energetic Loli | `BV520_streaming` |
-| 12 | Bright Honey | `VOV401_bytesing3_kangkangwuqu` |
-| 13 | Gentle Lady | `VOV402_bytesing3_oh` |
-| 14 | Elegant Mezzo-Soprano | `VOV402_bytesing3_aidelizan` |
-| 15 | Sakura | `jp_005` |
-| Unspecified / Other | Lady / Sister | `BV016_streaming` |
+| `0` | `labebe` | Ms. Labebe |
+| `1` | `cool_lady` | Cool Lady |
+| `2` | `happy_dino` | Happy Dino |
+| `3` | `puppet` | Funny Puppet |
+| `4` | `popular_guy` | Popular Guy |
+| `5` | `bratty_witch` | Bratty Witch |
+| `6` | `game_host` | Game Host |
+| `7` | `calm_dubbing` | Calm Dubbing |
+| `8` | `gruff_uncle` | Gruff Uncle |
+| `9` | `witch_granny` | Witch Granny |
+| `10` | `high_tension` | High Tension |
+| `11` | `serious_man` | Serious Man |
+| `12` | `manager` | Manager |
+| `13` | `little_sister` | Little Sister |
+| `14` | `young_girl` | Young Girl |
+| `15` | `peaceful_woman` | Peaceful Woman |
 
 ## Environment Variables
 
-Main environment variables:
+Main environment variables are listed below
 
-| Variable | Description | Example |
-| --- | --- | --- |
-| `CAPCUT_API_URL` | CapCut token endpoint | `https://edit-api-sg.capcut.com/lv/v1` |
-| `BYTEINTL_API_URL` | Base WebSocket endpoint | `wss://sami-sg1.byteintlapi.com/internal/api/v1` |
-| `DEVICE_TIME` | Value captured from CapCut request headers | Required |
-| `SIGN` | Value captured from CapCut request headers | Required |
-| `USER_AGENT` | User-Agent used for token requests | Chrome-like UA |
-| `HOST` | Server listen host | `0.0.0.0` |
-| `PORT` | Server listen port | `8080` |
-| `CORS_POLICY_ORIGIN` | Allowed CORS origin | `*` |
-| `ORIGIN` | Legacy compatibility origin setting | `*` |
-| `TOKEN_INTERVAL` | Token refresh interval in hours | `6` |
+| Variable | Description |
+| --- | --- |
+| `CAPCUT_WEB_URL` | Base CapCut Web URL |
+| `CAPCUT_EDIT_API_URL` | Base CapCut Edit API URL |
+| `CAPCUT_LOGIN_HOST` | Primary login host |
+| `CAPCUT_FALLBACK_LOGIN_HOST` | Fallback login host |
+| `CAPCUT_EMAIL` | CapCut login email |
+| `CAPCUT_PASSWORD` | CapCut login password |
+| `CAPCUT_LOCALE` | Locale sent to the API |
+| `CAPCUT_PAGE_LOCALE` | Locale used in the login page URL |
+| `CAPCUT_REGION` | Region used in CapCut requests |
+| `CAPCUT_STORE_COUNTRY_CODE` | Value for the `store-country-code` header |
+| `CAPCUT_DEVICE_ID` | Set this if you want to fix the device id |
+| `CAPCUT_VERIFY_FP` | Set this if you want to fix verifyFp |
+| `CAPCUT_BUNDLE_CONFIG_PATH` | Path for the persisted bundle config cache |
+| `CAPCUT_VOICE_CATEGORY_ID` | Category id used when fetching the voice catalog |
+| `CAPCUT_SESSION_STORE_PATH` | Session persistence path |
+| `LEGACY_CAPCUT_API_URL` | Base URL for the old token API |
+| `LEGACY_BYTEINTL_API_URL` | Base URL for the old websocket endpoint |
+| `LEGACY_DEVICE_TIME` | Device-Time sent to the old token API |
+| `LEGACY_SIGN` | Sign sent to the old token API |
+| `LEGACY_TOKEN_INTERVAL` | Legacy token refresh interval in hours |
+| `USER_AGENT` | User-Agent sent to CapCut |
+| `SESSION_REFRESH_INTERVAL_MINUTES` | Background session validation interval |
+| `HOST` | Server bind host |
+| `PORT` | Server bind port |
+| `CORS_POLICY_ORIGIN` | Allowed CORS origin |
 
-## npm Scripts
+## npm scripts
 
 | Command | Description |
 | --- | --- |
-| `npm run dev` | Start the dev server with `tsx watch` |
-| `npm run typecheck` | Run TypeScript type checking |
-| `npm run lint` | Lint `src/**/*.ts` with ESLint |
-| `npm run lint:fix` | Apply ESLint auto-fixes |
-| `npm run build` | Build into `dist/` |
+| `npm run dev` | Start the development server |
+| `npm run typecheck` | TypeScript type check |
+| `npm run lint` | ESLint |
+| `npm run build` | Build to `dist/` |
 | `npm run start` | Start the built app |
-| `npm run test` | Run `build` and then `start` |
-
-## Directory Layout
-
-```text
-.
-├─ src/
-│  ├─ api/
-│  ├─ configs/
-│  ├─ middleware/
-│  ├─ routes/
-│  │  └─ v1/
-│  │     └─ synthesize/
-│  ├─ schemas/
-│  ├─ services/
-│  ├─ types/
-│  └─ utils/
-├─ images/
-├─ openapi.yaml
-├─ package.json
-└─ tsconfig.json
-```
+| `npm run capcut:extract` | Generate `capcut-bundle-config.json` from HAR files |
 
 ## Additional Notes
 
-- The server tries to fetch a token at startup, then refreshes it every `TOKEN_INTERVAL` hours
-- The current structure prefers `CORS_POLICY_ORIGIN`
-- `ORIGIN` is still supported for backward compatibility
+- The server attempts a session warmup on startup and validates it every `SESSION_REFRESH_INTERVAL_MINUTES`
+- When bundle settings are needed, the server loads `capcut-bundle-config.json` first and refreshes it through live extraction only when necessary
+- When `LEGACY_DEVICE_TIME` and `LEGACY_SIGN` are set, the server also warms up the legacy token flow on startup
+- You can also pass `effectId`, `resourceId`, or `speaker` directly to `voice`
+- The current CapCut Web TTS returns MP3, so the response content type is `audio/mpeg`

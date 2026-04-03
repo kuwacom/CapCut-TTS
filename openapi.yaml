@@ -2,18 +2,42 @@ openapi: 3.0.1
 
 info:
   title: CapCut TTS Proxy
-  description: CapCut TTS API を扱いやすくするラッパープロキシ
-  version: 1.3.0
+  description: CapCut Web の session を維持しながら音声生成を行うラッパー API
+  version: 2.1.0
 
 servers:
-  - url: http://localhost:8080/v1
+  - url: http://localhost:8080
     description: ローカル開発用サーバー
 
 paths:
-  /synthesize:
+  /v1/models:
+    get:
+      summary: 利用可能な音声モデル一覧
+      description: CapCut で利用可能な音声モデル一覧を返します。
+      tags:
+        - Models
+      responses:
+        '200':
+          description: モデル一覧の取得に成功した場合
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Model'
+        '502':
+          description: CapCut 側から音声モデル一覧を取得できなかった場合
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /v1/synthesize:
     get:
       summary: 音声合成
-      description: CapCut の TTS API を使って WAV 音声を返します。
+      description: CapCut Web の最新 TTS 経路を使って MP3 音声を返します。
       tags:
         - TTS
       parameters:
@@ -27,7 +51,86 @@ paths:
         - name: type
           in: query
           required: false
-          description: 音声タイプ
+          description: 互換用の voice index
+          schema:
+            type: integer
+            default: 0
+        - name: voice
+          in: query
+          required: false
+          description: 明示的な voice 指定。alias / effectId / resourceId / speaker を受け付けます
+          schema:
+            type: string
+            example: labebe
+        - name: pitch
+          in: query
+          required: false
+          description: 旧互換パラメーター。現在の Web TTS では未使用です
+          schema:
+            type: integer
+            default: 10
+        - name: speed
+          in: query
+          required: false
+          description: 再生速度。10 が等速です
+          schema:
+            type: integer
+            default: 10
+        - name: volume
+          in: query
+          required: false
+          description: 音量。10 が標準です
+          schema:
+            type: integer
+            default: 10
+        - name: method
+          in: query
+          required: false
+          description: レスポンスの返し方
+          schema:
+            type: string
+            enum:
+              - buffer
+              - stream
+            default: buffer
+      responses:
+        '200':
+          description: 音声生成に成功した場合
+          content:
+            audio/mpeg:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: クエリパラメーターが不正な場合
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '502':
+          description: CapCut 側の認証または音声生成に失敗した場合
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /legacy/synthesize:
+    get:
+      summary: 旧音声合成
+      description: 旧 token + websocket フローを使って WAV 音声を返します。
+      tags:
+        - TTS
+      parameters:
+        - name: text
+          in: query
+          required: true
+          description: 読み上げるテキスト
+          schema:
+            type: string
+            example: こんにちは
+        - name: type
+          in: query
+          required: false
+          description: legacy voice index
           schema:
             type: integer
             default: 0
@@ -77,13 +180,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '502':
-          description: CapCut 側の音声生成に失敗した場合
+          description: CapCut 側の legacy 音声生成に失敗した場合
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
         '503':
-          description: CapCut トークンが取得できていない場合
+          description: legacy endpoint に必要な環境変数が未設定の場合
           content:
             application/json:
               schema:
@@ -97,3 +200,24 @@ components:
         error:
           type: string
           example: Failed to synthesize audio
+    Model:
+      type: object
+      properties:
+        id:
+          type: string
+          example: '7530105822785899777'
+        title:
+          type: string
+          example: ラベベさん
+        description:
+          type: string
+          example: 英語の明るい女性ボイス
+        speaker:
+          type: string
+          example: ICL_en_female_jiaoao
+        effectId:
+          type: string
+          example: '7530105822785899777'
+        resourceId:
+          type: string
+          example: '7530105822785899777'

@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { synthesize } from './synthesize.controller';
+import { synthesize } from '@/routes/v1/synthesize/synthesize.controller';
 
 const synthesizeRouter = Router();
 

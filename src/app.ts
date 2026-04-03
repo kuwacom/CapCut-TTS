@@ -4,6 +4,9 @@ import env from '@/configs/env';
 import { loggerMiddleware } from '@/middleware/logger';
 import router from '@/routes';
 
+/**
+ * Express アプリ本体
+ */
 const app = express();
 
 // cors 設定

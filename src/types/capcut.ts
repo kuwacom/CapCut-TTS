@@ -1,40 +1,58 @@
+/**
+ * 音声合成リクエストの入力
+ */
 export interface SynthesizeOptions {
   text: string;
-  type: number;
+  type: number | string;
+  voice?: string;
   pitch: number;
   speed: number;
   volume: number;
 }
 
-export interface SynthesizePayload {
-  text: string;
+/**
+ * 音声プリセットの内部表現
+ */
+export interface VoicePreset {
+  title: string;
+  description: string;
   speaker: string;
-  pitch: number;
-  speed: number;
-  volume: number;
-  rate: number;
-  appid: string;
+  effectId: string;
+  resourceId: string;
 }
 
-export interface SynthesizeTaskMessage {
-  token: string;
-  appkey: string;
-  namespace: 'TTS';
-  event: 'StartTask';
-  payload: string;
+/**
+ * /models エンドポイントで返す音声モデル
+ */
+export interface VoiceModel {
+  id: string;
+  title: string;
+  description: string;
+  speaker: string;
+  effectId: string;
+  resourceId: string;
 }
 
-export interface TaskStatus {
-  task_id: string;
-  message_id: string;
-  namespace: string;
-  event: string;
-  status_code: number;
-  status_text: string;
+/**
+ * CapCut ログイン済みセッション
+ */
+export interface CapCutSessionState {
+  userId: string;
+  screenName: string;
+  workspaceId: string;
+  loginHost: string;
+  verifyFp: string;
+  deviceId: string;
+  loggedInAt: number;
+  verifiedAt: number;
 }
 
-export interface TokenState {
-  token: string;
-  appKey: string;
-  refreshedAt: number;
+/**
+ * バッファ取得時の音声レスポンス
+ */
+export interface AudioResult {
+  buffer: Buffer;
+  contentType: string;
+  contentLength?: string;
+  fileName?: string;
 }
