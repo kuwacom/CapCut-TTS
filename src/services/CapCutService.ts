@@ -170,6 +170,7 @@ class CapCutService {
    */
   async warmup() {
     await this.refreshLoginBundleConfig();
+    await this.ensureEditorBundleConfig();
     await this.ensureAuthenticated();
     await this.loadVoices();
     void this.refreshEditorBundleConfig();
@@ -231,6 +232,28 @@ class CapCutService {
     this.runtimeEditorBundleConfig =
       await capCutBundleService.resolveEditorBundleConfig(
         this.fetchWithCookies.bind(this)
+      );
+  }
+
+  /**
+   * workspace / TTS 実行に足りる editor bundle 設定かを判定する
+   */
+  private hasUsableEditorBundleConfig() {
+    return this.runtimeEditorBundleConfig.sourceUrls.length > 0;
+  }
+
+  /**
+   * 必要なら live bundle から editor 設定を再取得する
+   */
+  private async ensureEditorBundleConfig(forceRefresh = false) {
+    if (!forceRefresh && this.hasUsableEditorBundleConfig()) {
+      return;
+    }
+
+    this.runtimeEditorBundleConfig =
+      await capCutBundleService.resolveEditorBundleConfig(
+        this.fetchWithCookies.bind(this),
+        true
       );
   }
 
@@ -414,7 +437,13 @@ class CapCutService {
    * bundle 由来 sign recipe を返す
    */
   private getResolvedSignRecipe() {
-    return this.runtimeEditorBundleConfig.signRecipe;
+    const signRecipe = this.runtimeEditorBundleConfig.signRecipe;
+
+    return {
+      ...signRecipe,
+      // 古い bundle 断片だと 4 が取れることがあるが、実 API 検証では 7 以上でないと workspace が通らない
+      pathTailLength: Math.max(signRecipe?.pathTailLength ?? 7, 7),
+    };
   }
 
   /**
@@ -524,15 +553,22 @@ class CapCutService {
   }
 
   /**
+   * login host を切り替える前に Cookie 状態を初期化する
+   */
+  private async resetLoginAttemptState() {
+    this.cookieJar.clear();
+    this.seedPassportCookies();
+    await this.primeCookies();
+  }
+
+  /**
    * CapCut へログインしてワークスペースまで確定させる
    */
   private async login(): Promise<CapCutSessionState> {
     logger.info('CapCut login flow started');
-    this.cookieJar.clear();
-    this.seedPassportCookies();
     this.verifyFp = env.CAPCUT_VERIFY_FP ?? createVerifyFp();
     await this.refreshLoginBundleConfig();
-    await this.primeCookies();
+    await this.resetLoginAttemptState();
 
     const resolvedRegion = await this.resolveLoginRegion().catch((error) => {
       logger.info('CapCut region bootstrap failed. Falling back to defaults', {
@@ -552,8 +588,13 @@ class CapCutService {
 
     let lastError: unknown;
 
-    for (const loginHost of loginHosts) {
+    for (const [index, loginHost] of loginHosts.entries()) {
       try {
+        if (index > 0) {
+          // 前回 host の session cookie を持ち越すと account/info が失効扱いになりやすい
+          await this.resetLoginAttemptState();
+        }
+
         await this.primeLoginState(loginHost);
         const loginData = await this.loginWithHost(loginHost);
         const accountInfo = await this.fetchAccountInfo().catch((error) => {
@@ -563,6 +604,7 @@ class CapCutService {
           );
           return null;
         });
+        await this.ensureEditorBundleConfig(true);
         const workspace = await this.fetchPrimaryWorkspace();
 
         const session: CapCutSessionState = {
@@ -826,10 +868,10 @@ class CapCutService {
   private async fetchPrimaryWorkspace(): Promise<WorkspaceInfo> {
     const data = await this.requestSignedEditJson<WorkspaceListResponse>({
       path: this.getResolvedWorkspacePath(),
-      appVersion: this.getResolvedWebAppVersion(),
+      appVersion: this.getResolvedEditorAppVersion(),
       extraHeaders: {
         lan: env.CAPCUT_LOCALE,
-        loc: 'sg',
+        loc: env.CAPCUT_REGION,
       },
       body: {
         cursor: '0',
@@ -1232,7 +1274,9 @@ class CapCutService {
     context: string;
   }) {
     if (this.runtimeEditorBundleConfig.sourceUrls.length === 0) {
-      await this.refreshEditorBundleConfig();
+      await this.ensureEditorBundleConfig(true);
+    } else if (!this.hasUsableEditorBundleConfig()) {
+      await this.ensureEditorBundleConfig(true);
     }
 
     const searchParams = options.searchParams ?? {};

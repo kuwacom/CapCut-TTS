@@ -75,6 +75,17 @@ class CapCutBundleService {
   private editorBundlePromise: Promise<CapCutBundleConfig['editor']> | null = null;
 
   /**
+   * workspace / TTS 実行に足りる editor bundle 設定かを判定する
+   */
+  private hasUsableEditorBundleConfig(config: CapCutBundleConfig['editor']) {
+    return (
+      typeof config.editorAppVersion === 'string' &&
+      /^\d+\.\d+\.\d+(?:-[A-Za-z0-9._-]+)?$/.test(config.editorAppVersion) &&
+      (config.signRecipe?.pathTailLength ?? 0) >= 7
+    );
+  }
+
+  /**
    * login bundle 設定を返す
    */
   async resolveLoginBundleConfig() {
@@ -101,12 +112,17 @@ class CapCutBundleService {
   /**
    * editor bundle 設定を返す
    */
-  async resolveEditorBundleConfig(requester?: ApiRequester) {
+  async resolveEditorBundleConfig(
+    requester?: ApiRequester,
+    forceRefresh = false
+  ) {
     await this.loadBundleConfigFromFile();
 
     if (
+      !forceRefresh &&
       this.editorBundleConfig &&
-      Date.now() - this.editorBundleDiscoveredAt < bundleCacheTtlMs
+      Date.now() - this.editorBundleDiscoveredAt < bundleCacheTtlMs &&
+      this.hasUsableEditorBundleConfig(this.editorBundleConfig)
     ) {
       return this.editorBundleConfig;
     }
@@ -307,7 +323,7 @@ class CapCutBundleService {
           );
         }
 
-        if (editorConfig.sourceUrls.length > 0) {
+        if (this.hasUsableEditorBundleConfig(editorConfig)) {
           break;
         }
       }
