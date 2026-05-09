@@ -166,6 +166,81 @@ class CapCutService {
   }
 
   /**
+   * 話者プレビュー音声をキャッシュ付きで返す
+   */
+  async getSpeakerPreviewAudio(speakerId: string): Promise<AudioResult> {
+    const previewFilePath = await this.ensureSpeakerPreviewFile(speakerId);
+    const buffer = await fs.readFile(previewFilePath);
+
+    return {
+      buffer,
+      contentType: 'audio/mpeg',
+      contentLength: String(buffer.byteLength),
+      fileName: `${speakerId}.mp3`,
+    };
+  }
+
+  /**
+   * 話者プレビュー音声を必要に応じて生成または再生成する
+   */
+  private async ensureSpeakerPreviewFile(speakerId: string): Promise<string> {
+    const speakers = await this.loadSpeakers();
+    const resolvedSpeaker = resolveSpeaker(speakerId, speakers, speakerId);
+    const previewDirectoryPath = path.resolve(
+      process.cwd(),
+      env.CAPCUT_SPEAKER_PREVIEW_TEMP_DIR
+    );
+    const previewFilePath = path.join(
+      previewDirectoryPath,
+      `${resolvedSpeaker.speaker}.mp3`
+    );
+
+    await fs.mkdir(previewDirectoryPath, { recursive: true });
+
+    const isRefreshRequired =
+      await this.isSpeakerPreviewRefreshRequired(previewFilePath);
+    if (!isRefreshRequired) {
+      return previewFilePath;
+    }
+
+    const previewAudio = await this.synthesizeBuffer({
+      text: env.CAPCUT_SPEAKER_PREVIEW_TEXT,
+      speaker: resolvedSpeaker.speaker,
+      type: 0,
+      pitch: 10,
+      speed: 10,
+      volume: 10,
+    });
+
+    await fs.writeFile(previewFilePath, previewAudio.buffer);
+
+    return previewFilePath;
+  }
+
+  /**
+   * 話者プレビュー音声の再生成が必要か判定する
+   */
+  private async isSpeakerPreviewRefreshRequired(
+    previewFilePath: string
+  ): Promise<boolean> {
+    try {
+      const stats = await fs.stat(previewFilePath);
+      const maxAgeMs =
+        env.CAPCUT_SPEAKER_PREVIEW_MAX_AGE_DAYS * 24 * 60 * 60 * 1000;
+
+      return Date.now() - stats.mtimeMs >= maxAgeMs;
+    } catch (error) {
+      const normalizedError = error as NodeJS.ErrnoException;
+
+      if (normalizedError.code === 'ENOENT') {
+        return true;
+      }
+
+      throw error;
+    }
+  }
+
+  /**
    * 起動時の事前ウォームアップ
    */
   async warmup() {

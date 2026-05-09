@@ -31,6 +31,40 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiErrorResponse'
+  /v2/speakers/{speakerId}/preview:
+    get:
+      summary: 話者プレビュー音声取得
+      description: 指定した話者のプレビュー音声を返します。初回アクセス時に生成して speaker-preview-temp へ保存し、以降はキャッシュを返します。キャッシュが指定日数を超えている場合は再生成します。
+      tags:
+        - Speakers
+      parameters:
+        - name: speakerId
+          in: path
+          required: true
+          description: 話者 ID
+          schema:
+            type: string
+            example: ICL_en_female_jiaoao
+      responses:
+        '200':
+          description: プレビュー音声取得に成功した場合
+          content:
+            audio/mpeg:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: 話者が見つからない場合
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '502':
+          description: プレビュー音声生成または取得に失敗した場合
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
   /v2/synthesize:
     get:
       summary: 音声合成 (GET)

@@ -10,6 +10,7 @@ Instead of the old `token + websocket` approach, this project follows the curren
 
 - Log in to CapCut Web with email / password and keep the session alive
 - Fetch available speakers via `GET /v2/speakers`
+- Fetch speaker preview audio via `GET /v2/speakers/:speakerId/preview`
 - Fetch MP3 audio via `GET /v2/synthesize`
 - Fetch MP3 audio via `POST /v2/synthesize` with a JSON body
 - Fetch WAV audio through the old token + websocket flow via `GET /v1/synthesize`
@@ -59,6 +60,9 @@ npm run dev
 ```bash
 # List available speakers
 curl "http://localhost:8080/v2/speakers"
+
+# Get speaker preview audio
+curl "http://localhost:8080/v2/speakers/ICL_en_female_jiaoao/preview" --output preview.mp3
 
 # Synthesize with GET
 curl "http://localhost:8080/v2/synthesize?text=Hello&speaker=labebe&method=buffer" --output voice.mp3
@@ -125,6 +129,7 @@ http://<host>:<port>/
 | Method | Path | Description |
 | --- | --- | --- |
 | GET | `/v2/speakers` | List available speakers |
+| GET | `/v2/speakers/:speakerId/preview` | Get speaker preview audio |
 | GET | `/v2/synthesize` | Synthesize audio using query parameters |
 | POST | `/v2/synthesize` | Synthesize audio using a JSON body |
 | GET | `/v1/models` | List legacy voice models |
@@ -145,6 +150,10 @@ http://<host>:<port>/
   }
 ]
 ```
+
+### `GET /v2/speakers/:speakerId/preview`
+
+Returns preview audio for the specified speaker. On first access, the server generates audio and stores it at `speaker-preview-temp/<speakerId>.mp3`. Subsequent requests return the cached file. If the file is older than `CAPCUT_SPEAKER_PREVIEW_MAX_AGE_DAYS`, it is regenerated.
 
 ### `GET /v2/synthesize` Query Parameters
 
@@ -237,6 +246,9 @@ Main environment variables are listed below.
 | `CAPCUT_BUNDLE_CONFIG_PATH` | Path for the persisted bundle config cache |
 | `CAPCUT_VOICE_CATEGORY_ID` | Category id used when fetching the voice catalog |
 | `CAPCUT_SESSION_STORE_PATH` | Session persistence path |
+| `CAPCUT_SPEAKER_PREVIEW_TEMP_DIR` | Directory used to cache speaker preview audio |
+| `CAPCUT_SPEAKER_PREVIEW_TEXT` | Text used to generate preview audio |
+| `CAPCUT_SPEAKER_PREVIEW_MAX_AGE_DAYS` | Preview regeneration threshold in days |
 | `LEGACY_CAPCUT_API_URL` | Base URL for the old token API |
 | `LEGACY_BYTEINTL_API_URL` | Base URL for the old websocket endpoint |
 | `LEGACY_DEVICE_TIME` | Device-Time sent to the old token API |

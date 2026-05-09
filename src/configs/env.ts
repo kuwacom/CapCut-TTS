@@ -56,10 +56,19 @@ const envSchema = z
       .min(1)
       .default('capcut-bundle-config.json'),
     CAPCUT_VOICE_CATEGORY_ID: z.coerce.number().int().positive().default(21699),
-    CAPCUT_SESSION_STORE_PATH: z
+    CAPCUT_SESSION_STORE_PATH: z.string().min(1).default('capcut-session.json'),
+    CAPCUT_SPEAKER_PREVIEW_TEMP_DIR: z
       .string()
       .min(1)
-      .default('capcut-session.json'),
+      .default('speaker-preview-temp'),
+    CAPCUT_SPEAKER_PREVIEW_TEXT: z
+      .string()
+      .min(1)
+      .default('こんにちは、これは話者プレビューです。'),
+    CAPCUT_SPEAKER_PREVIEW_MAX_AGE_DAYS: z.coerce
+      .number()
+      .positive()
+      .default(14),
     LEGACY_CAPCUT_API_URL: z
       .string()
       .url()

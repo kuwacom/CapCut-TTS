@@ -7,6 +7,9 @@ dist/
 capcut-session.json
 capcut-bundle-config.json
 
+# generated audio cache
+speaker-preview-temp/
+
 # vscode
 .vscode/
 
