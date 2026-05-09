@@ -1,6 +1,7 @@
 import cors from 'cors';
 import express from 'express';
 import env from '@/configs/env';
+import { errorHandler } from '@/middleware/errorHandler';
 import { loggerMiddleware } from '@/middleware/logger';
 import router from '@/routes';
 
@@ -18,5 +19,6 @@ app.use(loggerMiddleware);
 
 // ルーティング設定
 app.use('/', router);
+app.use(errorHandler);
 
 export default app;

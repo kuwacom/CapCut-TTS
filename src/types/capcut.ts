@@ -1,10 +1,12 @@
+import type { Readable } from 'node:stream';
+
 /**
  * 音声合成リクエストの入力
  */
 export interface SynthesizeOptions {
   text: string;
   type: number | string;
-  voice?: string;
+  speaker?: string;
   pitch: number;
   speed: number;
   volume: number;
@@ -13,24 +15,27 @@ export interface SynthesizeOptions {
 /**
  * 音声プリセットの内部表現
  */
-export interface VoicePreset {
+export interface Speaker {
   title: string;
   description: string;
   speaker: string;
   effectId: string;
   resourceId: string;
+  style?: string;
+  language?: string;
 }
 
 /**
- * /models エンドポイントで返す音声モデル
+ * /speakers エンドポイントで返す話者
  */
-export interface VoiceModel {
+export interface SpeakerInfo {
   id: string;
-  title: string;
-  description: string;
-  speaker: string;
-  effectId: string;
   resourceId: string;
+  effectId: string;
+  name: string;
+  description: string;
+  style: string;
+  language: string;
 }
 
 /**
@@ -52,6 +57,16 @@ export interface CapCutSessionState {
  */
 export interface AudioResult {
   buffer: Buffer;
+  contentType: string;
+  contentLength?: string;
+  fileName?: string;
+}
+
+/**
+ * ストリーム取得時の音声レスポンス
+ */
+export interface AudioStreamResult {
+  stream: Readable;
   contentType: string;
   contentLength?: string;
   fileName?: string;

@@ -27,37 +27,6 @@ const defaultBundleConfig = (): CapCutBundleConfig => ({
 const toAbsoluteUrl = (url: string) =>
   new URL(url, env.CAPCUT_WEB_URL).toString();
 
-const mergeBundleConfig = (
-  current: CapCutBundleConfig,
-  next: CapCutBundleConfig
-): CapCutBundleConfig => ({
-  discoveredAt: Math.max(current.discoveredAt, next.discoveredAt),
-  login: {
-    ...current.login,
-    ...next.login,
-  },
-  editor: {
-    ...current.editor,
-    ...next.editor,
-    sourceUrls: Array.from(
-      new Set([...(current.editor.sourceUrls ?? []), ...(next.editor.sourceUrls ?? [])])
-    ),
-    signRecipe: {
-      ...current.editor.signRecipe,
-      ...next.editor.signRecipe,
-    },
-    voiceCategoryIds:
-      next.editor.voiceCategoryIds && next.editor.voiceCategoryIds.length > 0
-        ? Array.from(
-            new Set([
-              ...(current.editor.voiceCategoryIds ?? []),
-              ...next.editor.voiceCategoryIds,
-            ])
-          ).sort((left, right) => left - right)
-        : current.editor.voiceCategoryIds,
-  },
-});
-
 /**
  * CapCut の live bundle から設定値を抽出してキャッシュする
  */
