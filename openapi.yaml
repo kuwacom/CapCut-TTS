@@ -10,33 +10,30 @@ servers:
     description: ローカル開発用サーバー
 
 paths:
-  /v1/models:
+  /v2/speakers:
     get:
-      summary: 利用可能な音声モデル一覧
-      description: CapCut で利用可能な音声モデル一覧を返します。
+      summary: 利用可能な話者一覧
+      description: CapCut で利用可能な話者一覧を返します。
       tags:
-        - Models
+        - Speakers
       responses:
         '200':
-          description: モデル一覧の取得に成功した場合
+          description: 話者一覧の取得に成功した場合
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  data:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/Model'
+                type: array
+                items:
+                  $ref: '#/components/schemas/Speaker'
         '502':
-          description: CapCut 側から音声モデル一覧を取得できなかった場合
+          description: CapCut 側から話者一覧を取得できなかった場合
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
-  /v1/synthesize:
+                $ref: '#/components/schemas/ApiErrorResponse'
+  /v2/synthesize:
     get:
-      summary: 音声合成
+      summary: 音声合成 (GET)
       description: CapCut Web の最新 TTS 経路を使って MP3 音声を返します。
       tags:
         - TTS
@@ -48,20 +45,20 @@ paths:
           schema:
             type: string
             example: こんにちは
-        - name: type
+        - name: speaker
           in: query
           required: false
-          description: 互換用の voice index
-          schema:
-            type: integer
-            default: 0
-        - name: voice
-          in: query
-          required: false
-          description: 明示的な voice 指定。alias / effectId / resourceId / speaker を受け付けます
+          description: 話者指定。alias / effectId / resourceId / speaker name を受け付けます。type より優先されます。
           schema:
             type: string
             example: labebe
+        - name: type
+          in: query
+          required: false
+          description: フォールバック用の voice index。speaker 未指定時に使用されます。
+          schema:
+            type: integer
+            default: 0
         - name: pitch
           in: query
           required: false
@@ -106,19 +103,65 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: '#/components/schemas/ApiErrorResponse'
         '502':
           description: CapCut 側の認証または音声生成に失敗した場合
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
-  /legacy/synthesize:
+                $ref: '#/components/schemas/ApiErrorResponse'
+    post:
+      summary: 音声合成 (POST)
+      description: GET と同じパラメーターを JSON body で受け付けます。
+      tags:
+        - TTS
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SynthesizeRequest'
+      responses:
+        '200':
+          description: 音声生成に成功した場合
+          content:
+            audio/mpeg:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: リクエストボディが不正な場合
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '502':
+          description: CapCut 側の認証または音声生成に失敗した場合
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+  /v1/models:
+    get:
+      summary: 旧音声モデル一覧
+      description: 旧 v1 の type 番号に対応する音声モデル一覧を返します。
+      tags:
+        - Legacy
+      responses:
+        '200':
+          description: 旧音声モデル一覧の取得に成功した場合
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LegacyModel'
+  /v1/synthesize:
     get:
       summary: 旧音声合成
       description: 旧 token + websocket フローを使って WAV 音声を返します。
       tags:
-        - TTS
+        - Legacy
       parameters:
         - name: text
           in: query
@@ -178,46 +221,129 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: '#/components/schemas/ApiErrorResponse'
         '502':
           description: CapCut 側の legacy 音声生成に失敗した場合
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: '#/components/schemas/ApiErrorResponse'
         '503':
           description: legacy endpoint に必要な環境変数が未設定の場合
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: '#/components/schemas/ApiErrorResponse'
 
 components:
   schemas:
-    Error:
+    ApiErrorResponse:
       type: object
+      required:
+        - code
+        - message
       properties:
-        error:
+        code:
+          type: string
+          example: BAD_GATEWAY
+        message:
           type: string
           example: Failed to synthesize audio
-    Model:
+        details:
+          type: array
+          description: バリデーション失敗時のみ返る詳細情報
+          items:
+            type: object
+    Speaker:
       type: object
+      required:
+        - id
+        - resourceId
+        - effectId
+        - name
+        - description
+        - style
+        - language
       properties:
         id:
           type: string
+          description: 内部 speaker name
+          example: ICL_en_female_jiaoao
+        resourceId:
+          type: string
           example: '7530105822785899777'
-        title:
+        effectId:
+          type: string
+          example: '7530105822785899777'
+        name:
           type: string
           example: ラベベさん
         description:
           type: string
           example: 英語の明るい女性ボイス
+        style:
+          type: string
+          description: 話者スタイル（将来用、現在は空文字）
+          example: ''
+        language:
+          type: string
+          example: en
+    SynthesizeRequest:
+      type: object
+      required:
+        - text
+      properties:
+        text:
+          type: string
+          description: 読み上げるテキスト
+          example: こんにちは
         speaker:
           type: string
-          example: ICL_en_female_jiaoao
-        effectId:
+          description: 話者指定。type より優先されます。
+          example: labebe
+        type:
+          oneOf:
+            - type: integer
+            - type: string
+          description: フォールバック用の voice index
+          default: 0
+        pitch:
+          type: integer
+          default: 10
+        speed:
+          type: integer
+          default: 10
+        volume:
+          type: integer
+          default: 10
+        method:
           type: string
-          example: '7530105822785899777'
-        resourceId:
+          enum:
+            - buffer
+            - stream
+          default: buffer
+    LegacyModel:
+      type: object
+      required:
+        - id
+        - name
+        - description
+        - language
+        - type
+      properties:
+        id:
           type: string
-          example: '7530105822785899777'
+          example: BV525_streaming
+        name:
+          type: string
+          example: 謎1 男子1
+        description:
+          type: string
+          example: 男性ボイス
+        language:
+          type: string
+          example: ja
+        type:
+          type: integer
+          description: 旧 v1 の音声タイプ番号
+          example: 0

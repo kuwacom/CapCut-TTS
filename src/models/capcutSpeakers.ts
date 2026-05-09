@@ -1,10 +1,10 @@
-import type { VoicePreset } from '@/types/capcut';
+import type { Speaker } from '@/types/capcut';
 
 /**
  * HAR から確認できた代表的な音声のフォールバック一覧
  * 基本は取得してきたものを利用する
  */
-export const fallbackVoicePresets: VoicePreset[] = [
+export const fallbackSpeakers: Speaker[] = [
   {
     title: 'ラベベさん',
     description: '英語の明るい女性ボイス',
@@ -115,7 +115,7 @@ export const fallbackVoicePresets: VoicePreset[] = [
 /**
  * ユーザー向け別名から resourceId へ解決する辞書
  */
-export const voiceAliases: Record<string, string> = {
+export const speakerAliases: Record<string, string> = {
   labebe: '7530105822785899777',
   cool_lady: '7530107275239869713',
   happy_dino: '7527795878967446801',

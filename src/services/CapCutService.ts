@@ -18,17 +18,14 @@ import { getLoginPage } from '@/api/capcut-web/api/getLoginPage';
 import env from '@/configs/env';
 import { CookieJar } from '@/lib/capcut/cookieJar';
 import { capCutConstants } from '@/lib/capcut/constants';
+import { CapCutApiError, unwrapJsonResponse } from '@/lib/capcut/responseUtils';
 import {
-  CapCutApiError,
-  unwrapJsonResponse,
-} from '@/lib/capcut/responseUtils';
-import {
-  parseVoicePreset,
-  resolveVoicePreset,
-  toVoiceModels,
+  parseSpeaker,
+  resolveSpeaker,
+  toSpeakerInfoList,
 } from '@/lib/capcut/voiceUtils';
 import { capCutVoiceCategoryIds } from '@/models/capcutVoiceCategories';
-import { fallbackVoicePresets } from '@/models/capcutVoiceModels';
+import { fallbackSpeakers } from '@/models/capcutSpeakers';
 import capCutBundleService from '@/services/CapCutBundleService';
 import logger from '@/services/logger';
 import type {
@@ -49,10 +46,11 @@ import type {
 } from '@/types/capcutApi';
 import type {
   AudioResult,
+  AudioStreamResult,
   CapCutSessionState,
+  SpeakerInfo,
+  Speaker,
   SynthesizeOptions,
-  VoiceModel,
-  VoicePreset,
 } from '@/types/capcut';
 import type { PersistedSessionState } from '@/types/capcutSession';
 import {
@@ -107,9 +105,9 @@ class CapCutService {
 
   private sessionPromise: Promise<CapCutSessionState> | null = null;
 
-  private voices: VoicePreset[] | null = null;
+  private speakers: Speaker[] | null = null;
 
-  private voicesLoadedAt = 0;
+  private speakersLoadedAt = 0;
 
   private verifyFp = env.CAPCUT_VERIFY_FP ?? createVerifyFp();
 
@@ -141,7 +139,9 @@ class CapCutService {
   /**
    * 音声をストリームとして取得する
    */
-  async synthesizeStream(options: SynthesizeOptions) {
+  async synthesizeStream(
+    options: SynthesizeOptions
+  ): Promise<AudioStreamResult> {
     const response = await this.createAudioResponse(options);
 
     if (!response.body) {
@@ -159,10 +159,10 @@ class CapCutService {
   }
 
   /**
-   * 利用可能な音声モデル一覧を返す
+   * 利用可能な話者一覧を返す
    */
-  async listModels(): Promise<VoiceModel[]> {
-    return toVoiceModels(await this.loadVoices());
+  async listSpeakers(): Promise<SpeakerInfo[]> {
+    return toSpeakerInfoList(await this.loadSpeakers());
   }
 
   /**
@@ -172,7 +172,7 @@ class CapCutService {
     await this.refreshLoginBundleConfig();
     await this.ensureEditorBundleConfig();
     await this.ensureAuthenticated();
-    await this.loadVoices();
+    await this.loadSpeakers();
     void this.refreshEditorBundleConfig();
   }
 
@@ -270,14 +270,19 @@ class CapCutService {
    * bundle 由来 login email path を返す
    */
   private getResolvedEmailLoginPath() {
-    return this.runtimeLoginBundleConfig.emailLoginPath ?? '/passport/web/email/login/';
+    return (
+      this.runtimeLoginBundleConfig.emailLoginPath ??
+      '/passport/web/email/login/'
+    );
   }
 
   /**
    * bundle 由来 login user path を返す
    */
   private getResolvedUserLoginPath() {
-    return this.runtimeLoginBundleConfig.userLoginPath ?? '/passport/web/user/login/';
+    return (
+      this.runtimeLoginBundleConfig.userLoginPath ?? '/passport/web/user/login/'
+    );
   }
 
   /**
@@ -291,7 +296,10 @@ class CapCutService {
    * bundle 由来 account info path を返す
    */
   private getResolvedAccountInfoPath() {
-    return this.runtimeLoginBundleConfig.accountInfoPath ?? '/passport/web/account/info/';
+    return (
+      this.runtimeLoginBundleConfig.accountInfoPath ??
+      '/passport/web/account/info/'
+    );
   }
 
   /**
@@ -457,7 +465,9 @@ class CapCutService {
    * bundle 由来 sign version を返す
    */
   private getResolvedSignVersion() {
-    return this.runtimeEditorBundleConfig.signRecipe?.signVersion ?? signVersion;
+    return (
+      this.runtimeEditorBundleConfig.signRecipe?.signVersion ?? signVersion
+    );
   }
 
   /**
@@ -904,32 +914,32 @@ class CapCutService {
   /**
    * 音声一覧をロードする
    */
-  private async loadVoices(): Promise<VoicePreset[]> {
-    const cacheAge = Date.now() - this.voicesLoadedAt;
+  private async loadSpeakers(): Promise<Speaker[]> {
+    const cacheAge = Date.now() - this.speakersLoadedAt;
 
-    if (this.voices && cacheAge < voiceCacheMs) {
-      return this.voices;
+    if (this.speakers && cacheAge < voiceCacheMs) {
+      return this.speakers;
     }
 
     try {
-      const voices = await this.requestVoiceList();
-      this.voices = voices.length > 0 ? voices : fallbackVoicePresets;
-      this.voicesLoadedAt = Date.now();
-      return this.voices;
+      const speakers = await this.requestSpeakerList();
+      this.speakers = speakers.length > 0 ? speakers : fallbackSpeakers;
+      this.speakersLoadedAt = Date.now();
+      return this.speakers;
     } catch (error) {
       logger.warn('Failed to refresh CapCut voice catalog. Using fallback', {
         error,
       });
-      this.voices = fallbackVoicePresets;
-      this.voicesLoadedAt = Date.now();
-      return this.voices;
+      this.speakers = fallbackSpeakers;
+      this.speakersLoadedAt = Date.now();
+      return this.speakers;
     }
   }
 
   /**
    * CapCut の音声モデル一覧 API を叩く
    */
-  private async requestVoiceList(): Promise<VoicePreset[]> {
+  private async requestSpeakerList(): Promise<Speaker[]> {
     const voiceResponses = await Promise.allSettled(
       this.getResolvedVoiceCategoryIds().map(async (categoryId) => {
         const payload = await unwrapJsonResponse<VoiceListResponse>(
@@ -990,7 +1000,7 @@ class CapCutService {
       })
     );
 
-    const voiceMap = new Map<string, VoicePreset>();
+    const speakerMap = new Map<string, Speaker>();
 
     for (const result of voiceResponses) {
       if (result.status !== 'fulfilled') {
@@ -1002,19 +1012,19 @@ class CapCutService {
 
       const effectItems = result.value;
       for (const item of effectItems) {
-        const voicePreset = parseVoicePreset(item);
+        const resolvedSpeaker = parseSpeaker(item);
 
-        if (!voicePreset) {
+        if (!resolvedSpeaker) {
           continue;
         }
 
-        if (!voiceMap.has(voicePreset.resourceId)) {
-          voiceMap.set(voicePreset.resourceId, voicePreset);
+        if (!speakerMap.has(resolvedSpeaker.resourceId)) {
+          speakerMap.set(resolvedSpeaker.resourceId, resolvedSpeaker);
         }
       }
     }
 
-    return Array.from(voiceMap.values());
+    return Array.from(speakerMap.values());
   }
 
   /**
@@ -1035,12 +1045,16 @@ class CapCutService {
     allowRetry: boolean
   ): Promise<Response> {
     try {
-      const voices = await this.loadVoices();
-      const voice = resolveVoicePreset(options.type, voices, options.voice);
+      const speakers = await this.loadSpeakers();
+      const resolvedSpeaker = resolveSpeaker(
+        options.type,
+        speakers,
+        options.speaker
+      );
       await this.ensureAuthenticated();
 
       try {
-        return await this.createAudioViaMultiPlatform(voice, options);
+        return await this.createAudioViaMultiPlatform(resolvedSpeaker, options);
       } catch (error) {
         logger.info(
           'CapCut multi_platform TTS failed. Falling back to editor intelligence flow',
@@ -1051,7 +1065,7 @@ class CapCutService {
       const session = await this.ensureAuthenticated();
       const taskId = await this.createTtsTask(
         session.workspaceId,
-        voice,
+        resolvedSpeaker,
         options
       );
       const taskDetail = await this.waitForTtsTask(session.workspaceId, taskId);
@@ -1083,7 +1097,7 @@ class CapCutService {
    * 直接音声 URL を返す multi_platform フロー
    */
   private async createAudioViaMultiPlatform(
-    voice: VoicePreset,
+    resolvedSpeaker: Speaker,
     options: SynthesizeOptions
   ): Promise<Response> {
     const ttsData = await this.requestSignedEditJson<MultiPlatformTtsResponse>({
@@ -1093,13 +1107,13 @@ class CapCutService {
       body: {
         texts: [options.text],
         tts_conf: {
-          speaker: voice.speaker,
+          speaker: resolvedSpeaker.speaker,
           rate: toPlaybackRate(options.speed),
           volume: toVolumeLevel(options.volume),
-          name: voice.title,
+          name: resolvedSpeaker.title,
           platform: 'sami',
-          effect_id: voice.effectId,
-          resource_id: voice.resourceId,
+          effect_id: resolvedSpeaker.effectId,
+          resource_id: resolvedSpeaker.resourceId,
           is_clone: false,
         },
         need_url: true,
@@ -1127,7 +1141,7 @@ class CapCutService {
    */
   private async createTtsTask(
     workspaceId: string,
-    voice: VoicePreset,
+    resolvedSpeaker: Speaker,
     options: SynthesizeOptions
   ) {
     const data = await this.requestSignedEditJson<TtsTaskResponse>({
@@ -1151,13 +1165,13 @@ class CapCutService {
           platform: ttsPlatform,
         }),
         req_json: JSON.stringify({
-          speaker: voice.speaker,
+          speaker: resolvedSpeaker.speaker,
           audio_config: {},
           disable_caption: true,
           commerce: {
             resource_type: 'material_artist',
             benefit_type: 'resource_export',
-            resource_id: voice.resourceId,
+            resource_id: resolvedSpeaker.resourceId,
           },
         }),
       },
@@ -1442,7 +1456,8 @@ const shouldTryOtherLoginHost = (error: unknown) =>
   !(error instanceof CapCutApiError && error.errorCode !== undefined);
 
 const isSemverLike = (value: string | undefined): value is string =>
-  typeof value === 'string' && /^\d+\.\d+\.\d+(?:-[A-Za-z0-9._-]+)?$/.test(value);
+  typeof value === 'string' &&
+  /^\d+\.\d+\.\d+(?:-[A-Za-z0-9._-]+)?$/.test(value);
 
 /**
  * デバッグログ用に秘匿ヘッダーを伏せる

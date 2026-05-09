@@ -1,8 +1,8 @@
 import { Router } from 'express';
-import { listModels } from '@/routes/v1/models/models.controller';
+import { get } from './get';
 
 const modelsRouter = Router();
 
-modelsRouter.get('/', listModels);
+modelsRouter.get('/', get);
 
 export default modelsRouter;

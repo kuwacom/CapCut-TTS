@@ -12,18 +12,38 @@ const singleQueryValue = <T extends z.ZodTypeAny>(schema: T) =>
 const numericQuery = (defaultValue: number) =>
   singleQueryValue(z.coerce.number().int()).default(defaultValue);
 
+const numericBody = (defaultValue: number) =>
+  z.coerce.number().int().default(defaultValue);
+
 const legacyTypeQuery = singleQueryValue(
   z.union([z.coerce.number().int(), z.string().trim().min(1)])
 ).default(0);
 
+const legacyTypeBody = z
+  .union([z.coerce.number().int(), z.string().trim().min(1)])
+  .default(0);
+
+const methodSchema = z.enum(['buffer', 'stream']).default('buffer');
+
 export const SynthesizeQuerySchema = z.object({
   text: singleQueryValue(z.string().trim().min(1, 'text is required')),
   type: legacyTypeQuery,
-  voice: singleQueryValue(z.string().trim().min(1)).optional(),
+  speaker: singleQueryValue(z.string().trim().min(1)).optional(),
   pitch: numericQuery(10),
   speed: numericQuery(10),
   volume: numericQuery(10),
-  method: singleQueryValue(z.enum(['buffer', 'stream'])).default('buffer'),
+  method: singleQueryValue(methodSchema),
+});
+
+export const SynthesizeBodySchema = z.object({
+  text: z.string().trim().min(1, 'text is required'),
+  type: legacyTypeBody,
+  speaker: z.string().trim().min(1).optional(),
+  pitch: numericBody(10),
+  speed: numericBody(10),
+  volume: numericBody(10),
+  method: methodSchema,
 });
 
 export type SynthesizeQuery = z.infer<typeof SynthesizeQuerySchema>;
+export type SynthesizeBody = z.infer<typeof SynthesizeBodySchema>;

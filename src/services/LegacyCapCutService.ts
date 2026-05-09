@@ -1,8 +1,9 @@
 import { Readable } from 'node:stream';
 import { WebSocket, type RawData } from 'ws';
 import env from '@/configs/env';
+import { legacySpeakers } from '@/models/capcutLegacySpeakers';
 import logger from '@/services/logger';
-import type { AudioResult } from '@/types/capcut';
+import type { AudioResult, AudioStreamResult } from '@/types/capcut';
 import type {
   LegacyGetTokenResponse,
   LegacySynthesizeOptions,
@@ -12,33 +13,14 @@ import type {
   LegacyTokenState,
 } from '@/types/capcutLegacy';
 
-const legacyCapCutAppId = '348188';
-const legacyCapCutAppVersion = '5.8.0';
-const legacyCapCutSampleRate = 24000;
-const legacyDefaultSpeaker = 'BV016_streaming';
-const legacyPlatform = '7';
-const legacySignVersion = '1';
-const legacyTokenRequestTimeoutMs = 10_000;
-const legacyTokenRetryDelayMs = 60_000;
-
-const legacySpeakers = [
-  'BV525_streaming',
-  'BV528_streaming',
-  'BV017_streaming',
-  'BV016_streaming',
-  'BV023_streaming',
-  'BV024_streaming',
-  'BV018_streaming',
-  'BV523_streaming',
-  'BV521_streaming',
-  'BV522_streaming',
-  'BV524_streaming',
-  'BV520_streaming',
-  'VOV401_bytesing3_kangkangwuqu',
-  'VOV402_bytesing3_oh',
-  'VOV402_bytesing3_aidelizan',
-  'jp_005',
-] as const;
+const LEGACY_CAPCUT_APP_ID = '348188';
+const LEGACY_CAPCUT_APP_VERSION = '5.8.0';
+const LEGACY_CAPCUT_SAMPLE_RATE = 24000;
+const LEGACY_DEFAULT_SPEAKER = 'BV016_streaming';
+const LEGACY_PLATFORM = '7';
+const LEGACY_SIGN_VERSION = '1';
+const LEGACY_TOKEN_REQUEST_TIMEOUT_MS = 10_000;
+const LEGACY_TOKEN_RETRY_DELAY_MS = 60_000;
 
 class LegacyCapCutService {
   private readonly tokenState: LegacyTokenState = {
@@ -88,7 +70,9 @@ class LegacyCapCutService {
   /**
    * 旧 websocket フローで音声をストリームとして取得する
    */
-  async synthesizeStream(options: LegacySynthesizeOptions) {
+  async synthesizeStream(
+    options: LegacySynthesizeOptions
+  ): Promise<AudioStreamResult> {
     const tokenState = await this.getTokenState();
 
     return {
@@ -134,7 +118,7 @@ class LegacyCapCutService {
         this.scheduleRefresh(env.LEGACY_TOKEN_INTERVAL * 60 * 60 * 1000);
         return this.tokenState;
       } catch (error) {
-        this.scheduleRefresh(legacyTokenRetryDelayMs);
+        this.scheduleRefresh(LEGACY_TOKEN_RETRY_DELAY_MS);
 
         if (this.isTokenReady()) {
           logger.warn(
@@ -184,15 +168,15 @@ class LegacyCapCutService {
       {
         method: 'POST',
         headers: new Headers({
-          Appvr: legacyCapCutAppVersion,
+          Appvr: LEGACY_CAPCUT_APP_VERSION,
           'Device-Time': env.LEGACY_DEVICE_TIME ?? '',
           Origin: env.CAPCUT_WEB_URL,
-          Pf: legacyPlatform,
+          Pf: LEGACY_PLATFORM,
           Sign: env.LEGACY_SIGN ?? '',
-          'Sign-Ver': legacySignVersion,
+          'Sign-Ver': LEGACY_SIGN_VERSION,
           'User-Agent': env.USER_AGENT,
         }),
-        signal: AbortSignal.timeout(legacyTokenRequestTimeoutMs),
+        signal: AbortSignal.timeout(LEGACY_TOKEN_REQUEST_TIMEOUT_MS),
       }
     );
 
@@ -366,7 +350,11 @@ class LegacyCapCutService {
     });
 
     ws.on('close', () => {
-      if (!taskFinished && !audioStream.destroyed && !audioStream.readableEnded) {
+      if (
+        !taskFinished &&
+        !audioStream.destroyed &&
+        !audioStream.readableEnded
+      ) {
         audioStream.destroy(
           new Error('Legacy CapCut websocket closed before the task finished')
         );
@@ -398,8 +386,8 @@ class LegacyCapCutService {
       pitch: options.pitch,
       speed: options.speed,
       volume: options.volume,
-      rate: legacyCapCutSampleRate,
-      appid: legacyCapCutAppId,
+      rate: LEGACY_CAPCUT_SAMPLE_RATE,
+      appid: LEGACY_CAPCUT_APP_ID,
     };
     const taskMessage: LegacySynthesizeTaskMessage = {
       token: tokenState.token,
@@ -456,7 +444,7 @@ class LegacyCapCutService {
 }
 
 const resolveLegacySpeaker = (type: number) =>
-  legacySpeakers[type] ?? legacyDefaultSpeaker;
+  legacySpeakers[type] ?? LEGACY_DEFAULT_SPEAKER;
 
 const rawDataToBuffer = (data: RawData): Buffer => {
   if (Buffer.isBuffer(data)) {
