@@ -3,7 +3,7 @@ openapi: 3.0.1
 info:
   title: CapCut TTS Proxy
   description: CapCut Web の session を維持しながら音声生成を行うラッパー API
-  version: 2.1.0
+  version: 2.2.0
 
 servers:
   - url: http://localhost:8080

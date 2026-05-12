@@ -249,6 +249,8 @@ GET と同じフィールドを JSON body で送信します。
 | `CAPCUT_SPEAKER_PREVIEW_TEMP_DIR` | 話者プレビュー音声キャッシュの保存先 |
 | `CAPCUT_SPEAKER_PREVIEW_TEXT` | プレビュー生成時に読み上げるテキスト |
 | `CAPCUT_SPEAKER_PREVIEW_MAX_AGE_DAYS` | プレビュー再生成までの日数 |
+| `CAPCUT_TTS_TEXT_CHUNK_MAX_LENGTH` | 長文 TTS を分割する最大文字数 |
+| `CAPCUT_TTS_TEXT_CHUNK_BOUNDARY_SEARCH_RATIO` | 区切り文字を探し始める位置の割合 |
 | `LEGACY_CAPCUT_API_URL` | 旧 token API のベース URL |
 | `LEGACY_BYTEINTL_API_URL` | 旧 WebSocket 接続先のベース URL |
 | `LEGACY_DEVICE_TIME` | 旧 token API に送る Device-Time |

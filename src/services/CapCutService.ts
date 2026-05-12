@@ -19,6 +19,7 @@ import env from '@/configs/env';
 import { CookieJar } from '@/lib/capcut/cookieJar';
 import { capCutConstants } from '@/lib/capcut/constants';
 import { CapCutApiError, unwrapJsonResponse } from '@/lib/capcut/responseUtils';
+import { splitTtsText } from '@/lib/string';
 import {
   parseSpeaker,
   resolveSpeaker,
@@ -125,14 +126,36 @@ class CapCutService {
    * 音声をバッファとして取得する
    */
   async synthesizeBuffer(options: SynthesizeOptions): Promise<AudioResult> {
-    const response = await this.createAudioResponse(options);
-    const buffer = Buffer.from(await response.arrayBuffer());
+    const chunkedTexts = splitTtsText(
+      options.text,
+      env.CAPCUT_TTS_TEXT_CHUNK_MAX_LENGTH,
+      env.CAPCUT_TTS_TEXT_CHUNK_BOUNDARY_SEARCH_RATIO
+    );
+    if (chunkedTexts.length === 1) {
+      const response = await this.createAudioResponse(options);
+      const buffer = Buffer.from(await response.arrayBuffer());
+
+      return {
+        buffer,
+        contentType: response.headers.get('content-type') ?? 'audio/mpeg',
+        contentLength: response.headers.get('content-length') ?? undefined,
+        fileName: this.extractFileName(response),
+      };
+    }
+
+    const chunkedResults = await this.synthesizeChunkedBuffers(
+      options,
+      chunkedTexts
+    );
+    const buffer = Buffer.concat(
+      chunkedResults.map((chunkResult) => chunkResult.buffer)
+    );
 
     return {
       buffer,
-      contentType: response.headers.get('content-type') ?? 'audio/mpeg',
-      contentLength: response.headers.get('content-length') ?? undefined,
-      fileName: this.extractFileName(response),
+      contentType: chunkedResults[0]?.contentType ?? 'audio/mpeg',
+      contentLength: String(buffer.byteLength),
+      fileName: chunkedResults[0]?.fileName,
     };
   }
 
@@ -142,19 +165,35 @@ class CapCutService {
   async synthesizeStream(
     options: SynthesizeOptions
   ): Promise<AudioStreamResult> {
-    const response = await this.createAudioResponse(options);
+    const chunkedTexts = splitTtsText(
+      options.text,
+      env.CAPCUT_TTS_TEXT_CHUNK_MAX_LENGTH,
+      env.CAPCUT_TTS_TEXT_CHUNK_BOUNDARY_SEARCH_RATIO
+    );
+    if (chunkedTexts.length === 1) {
+      const response = await this.createAudioResponse(options);
 
-    if (!response.body) {
-      throw new Error('CapCut audio response did not contain a body');
+      if (!response.body) {
+        throw new Error('CapCut audio response did not contain a body');
+      }
+
+      return {
+        stream: Readable.fromWeb(
+          response.body as unknown as import('node:stream/web').ReadableStream
+        ),
+        contentType: response.headers.get('content-type') ?? 'audio/mpeg',
+        contentLength: response.headers.get('content-length') ?? undefined,
+        fileName: this.extractFileName(response),
+      };
     }
 
+    const audioResult = await this.synthesizeBuffer(options);
+
     return {
-      stream: Readable.fromWeb(
-        response.body as unknown as import('node:stream/web').ReadableStream
-      ),
-      contentType: response.headers.get('content-type') ?? 'audio/mpeg',
-      contentLength: response.headers.get('content-length') ?? undefined,
-      fileName: this.extractFileName(response),
+      stream: Readable.from([audioResult.buffer]),
+      contentType: audioResult.contentType,
+      contentLength: audioResult.contentLength,
+      fileName: audioResult.fileName,
     };
   }
 
@@ -1110,6 +1149,33 @@ class CapCutService {
     options: SynthesizeOptions
   ): Promise<Response> {
     return this.createAudioResponseWithRetry(options, true);
+  }
+
+  /**
+   * 分割したテキストを並列で音声化する
+   */
+  private async synthesizeChunkedBuffers(
+    options: SynthesizeOptions,
+    chunkedTexts: string[]
+  ): Promise<AudioResult[]> {
+    const chunkResults = await Promise.all(
+      chunkedTexts.map(async (chunkText) => {
+        const response = await this.createAudioResponse({
+          ...options,
+          text: chunkText,
+        });
+        const buffer = Buffer.from(await response.arrayBuffer());
+
+        return {
+          buffer,
+          contentType: response.headers.get('content-type') ?? 'audio/mpeg',
+          contentLength: response.headers.get('content-length') ?? undefined,
+          fileName: this.extractFileName(response),
+        };
+      })
+    );
+
+    return chunkResults;
   }
 
   /**

@@ -69,6 +69,16 @@ const envSchema = z
       .number()
       .positive()
       .default(14),
+    CAPCUT_TTS_TEXT_CHUNK_MAX_LENGTH: z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(100),
+    CAPCUT_TTS_TEXT_CHUNK_BOUNDARY_SEARCH_RATIO: z.coerce
+      .number()
+      .positive()
+      .max(1)
+      .default(0.6),
     LEGACY_CAPCUT_API_URL: z
       .string()
       .url()

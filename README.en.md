@@ -249,6 +249,8 @@ Main environment variables are listed below.
 | `CAPCUT_SPEAKER_PREVIEW_TEMP_DIR` | Directory used to cache speaker preview audio |
 | `CAPCUT_SPEAKER_PREVIEW_TEXT` | Text used to generate preview audio |
 | `CAPCUT_SPEAKER_PREVIEW_MAX_AGE_DAYS` | Preview regeneration threshold in days |
+| `CAPCUT_TTS_TEXT_CHUNK_MAX_LENGTH` | Maximum text length for each long-form TTS chunk |
+| `CAPCUT_TTS_TEXT_CHUNK_BOUNDARY_SEARCH_RATIO` | Ratio where boundary search starts inside each TTS chunk |
 | `LEGACY_CAPCUT_API_URL` | Base URL for the old token API |
 | `LEGACY_BYTEINTL_API_URL` | Base URL for the old websocket endpoint |
 | `LEGACY_DEVICE_TIME` | Device-Time sent to the old token API |
