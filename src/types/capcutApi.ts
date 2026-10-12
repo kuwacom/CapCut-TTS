@@ -39,6 +39,23 @@ export interface VoiceListResponse {
 }
 
 /**
+ * voice panel 一括取得応答
+ */
+export interface VoicePanelResponse {
+  categories?: Array<{
+    category_id?: string | number;
+    category_name?: string;
+    category_key?: string;
+  }>;
+  category_resources?: Record<
+    string,
+    {
+      effect_item_list?: unknown[];
+    }
+  >;
+}
+
+/**
  * TTS タスク作成応答
  */
 export interface TtsTaskResponse {

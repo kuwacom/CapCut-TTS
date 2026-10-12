@@ -11,6 +11,7 @@ import { createMultiPlatformTts } from '@/api/capcut-edit/api/createMultiPlatfor
 import { createTtsTask } from '@/api/capcut-edit/api/createTtsTask';
 import { getUserWorkspaces } from '@/api/capcut-edit/api/getUserWorkspaces';
 import { getVoiceModels } from '@/api/capcut-edit/api/getVoiceModels';
+import { getVoicePanelInfo } from '@/api/capcut-edit/api/getVoicePanelInfo';
 import { queryTtsTask } from '@/api/capcut-edit/api/queryTtsTask';
 import { downloadAudio } from '@/api/capcut-media/api/downloadAudio';
 import { getAccountInfo } from '@/api/capcut-web/api/getAccountInfo';
@@ -42,6 +43,7 @@ import type {
   TtsQueryResponse,
   TtsTaskDetail,
   TtsTaskResponse,
+  VoicePanelResponse,
   VoiceListResponse,
   WorkspaceInfo,
   WorkspaceListResponse,
@@ -1054,36 +1056,99 @@ class CapCutService {
   /**
    * CapCut の音声モデル一覧 API を叩く
    */
+  /**
+   * CapCut の音声モデル一覧を取得する
+   * panel 一括取得を第一経路とし、失敗した場合だけカテゴリ別取得へ退避する
+   */
   private async requestSpeakerList(): Promise<Speaker[]> {
+    try {
+      return await this.requestSpeakerListFromPanel();
+    } catch (error) {
+      logger.warn(
+        'Failed to fetch CapCut voice panel. Falling back to category requests',
+        { error }
+      );
+
+      return this.requestSpeakerListFromCategories();
+    }
+  }
+
+  /**
+   * 音声カテゴリ API に共通のクエリパラメータを組み立てる
+   */
+  private getVoiceCatalogSearchParams(): Record<string, string> {
+    return {
+      aid: appId,
+      version_name: this.getResolvedVersionName(),
+      version_code: this.getResolvedVersionCode(),
+      sdk_version: this.getResolvedSdkVersion(),
+      effect_sdk_version: this.getResolvedEffectSdkVersion(),
+      device_platform: 'web',
+      region: env.CAPCUT_REGION,
+      language: env.CAPCUT_LOCALE,
+      device_type: 'web',
+      channel: 'online',
+    };
+  }
+
+  /**
+   * 音声カテゴリ API に共通のヘッダーを組み立てる
+   */
+  private getVoiceCatalogHeaders(): HeadersInit {
+    return {
+      Accept: 'application/json, text/plain, */*',
+      'Content-Type': 'application/json',
+      Origin: env.CAPCUT_WEB_URL,
+      Referer: `${env.CAPCUT_WEB_URL}/`,
+      'User-Agent': env.USER_AGENT,
+      appid: appId,
+      did: this.deviceId,
+      'store-country-code': env.CAPCUT_STORE_COUNTRY_CODE,
+      'store-country-code-src': 'uid',
+    };
+  }
+
+  /**
+   * voice panel を 1 リクエストで取得して話者一覧へ変換する
+   * カテゴリ ID は panel 応答から動的に決まるため、CapCut 側でカテゴリが増減しても追従できる
+   */
+  private async requestSpeakerListFromPanel(): Promise<Speaker[]> {
+    const payload = await unwrapJsonResponse<VoicePanelResponse>(
+      await getVoicePanelInfo({
+        requester: this.fetchWithCookies.bind(this),
+        searchParams: this.getVoiceCatalogSearchParams(),
+        headers: this.getVoiceCatalogHeaders(),
+        body: JSON.stringify({
+          panel: this.getResolvedVoicePanel(),
+          panel_source: this.getResolvedVoicePanelSource(),
+          get_all_resource: true,
+        }),
+      }),
+      'CapCut voice panel'
+    );
+
+    const effectItems = Object.values(
+      payload.category_resources ?? {}
+    ).flatMap((resource) =>
+      Array.isArray(resource.effect_item_list) ? resource.effect_item_list : []
+    );
+
+    return collectSpeakers(effectItems);
+  }
+
+  /**
+   * カテゴリ別 API から話者一覧を取得する
+   * panel 一括取得が使えない場合の退避経路
+   */
+  private async requestSpeakerListFromCategories(): Promise<Speaker[]> {
     const voiceResponses = await Promise.allSettled(
       this.getResolvedVoiceCategoryIds().map(async (categoryId) => {
         const payload = await unwrapJsonResponse<VoiceListResponse>(
           await getVoiceModels({
             requester: this.fetchWithCookies.bind(this),
             path: this.getResolvedVoiceListPath(),
-            searchParams: {
-              aid: appId,
-              version_name: this.getResolvedVersionName(),
-              version_code: this.getResolvedVersionCode(),
-              sdk_version: this.getResolvedSdkVersion(),
-              effect_sdk_version: this.getResolvedEffectSdkVersion(),
-              device_platform: 'web',
-              region: env.CAPCUT_REGION,
-              language: env.CAPCUT_LOCALE,
-              device_type: 'web',
-              channel: 'online',
-            },
-            headers: {
-              Accept: 'application/json, text/plain, */*',
-              'Content-Type': 'application/json',
-              Origin: env.CAPCUT_WEB_URL,
-              Referer: `${env.CAPCUT_WEB_URL}/`,
-              'User-Agent': env.USER_AGENT,
-              appid: appId,
-              did: this.deviceId,
-              'store-country-code': env.CAPCUT_STORE_COUNTRY_CODE,
-              'store-country-code-src': 'uid',
-            },
+            searchParams: this.getVoiceCatalogSearchParams(),
+            headers: this.getVoiceCatalogHeaders(),
             body: JSON.stringify({
               panel: this.getResolvedVoicePanel(),
               category_id: categoryId,
@@ -1115,31 +1180,19 @@ class CapCutService {
       })
     );
 
-    const speakerMap = new Map<string, Speaker>();
-
-    for (const result of voiceResponses) {
+    const effectItems = voiceResponses.flatMap((result) => {
       if (result.status !== 'fulfilled') {
         logger.warn('Failed to fetch one CapCut voice category', {
           error: result.reason,
         });
-        continue;
+
+        return [];
       }
 
-      const effectItems = result.value;
-      for (const item of effectItems) {
-        const resolvedSpeaker = parseSpeaker(item);
+      return result.value;
+    });
 
-        if (!resolvedSpeaker) {
-          continue;
-        }
-
-        if (!speakerMap.has(resolvedSpeaker.resourceId)) {
-          speakerMap.set(resolvedSpeaker.resourceId, resolvedSpeaker);
-        }
-      }
-    }
-
-    return Array.from(speakerMap.values());
+    return collectSpeakers(effectItems);
   }
 
   /**
@@ -1586,6 +1639,28 @@ const normalizeStringId = (value: unknown) =>
   typeof value === 'bigint'
     ? String(value)
     : null;
+
+/**
+ * effect_item_list を重複なしの話者一覧へ変換する
+ * resourceId が同一の項目は panel とカテゴリ API の両方に現れるため最初の 1 件だけ残す
+ */
+const collectSpeakers = (effectItems: unknown[]): Speaker[] => {
+  const speakerMap = new Map<string, Speaker>();
+
+  for (const item of effectItems) {
+    const resolvedSpeaker = parseSpeaker(item);
+
+    if (!resolvedSpeaker) {
+      continue;
+    }
+
+    if (!speakerMap.has(resolvedSpeaker.resourceId)) {
+      speakerMap.set(resolvedSpeaker.resourceId, resolvedSpeaker);
+    }
+  }
+
+  return Array.from(speakerMap.values());
+};
 
 /**
  * email/login 失敗時に user/login へフォールバックしてよいかを判定する

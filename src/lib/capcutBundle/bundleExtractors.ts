@@ -8,9 +8,6 @@ import {
   extractStringAssignment,
 } from '@/lib/capcutBundle/bundleExtractionUtils';
 
-const isBundleVersionLike = (value: string | undefined): value is string =>
-  Boolean(value && /^\d+\.\d+\.\d+(?:-[A-Za-z0-9._-]+)?$/.test(value));
-
 const mergeSignRecipe = (
   base: Partial<CapCutSignRecipe> | undefined,
   next: Partial<CapCutSignRecipe> | undefined
@@ -154,35 +151,23 @@ export const extractEditorBundleConfig = (
     };
   }
 
-  let webAppVersion: string | undefined;
-  const webAppVersionVariableMatch = bundleText.match(
-    /appvr:([A-Za-z_$][\w$]*),tdid:""/
+  // 現行 bundle では version_name が変数フォールバックになり抽出できないため
+  // artist API パラメータの version_code リテラルを両方に流用する
+  // 単純な version_code 検索だと editor 内部の別バージョンを拾うため文脈で固定する
+  const versionCode = extractFirst(
+    bundleText,
+    /version_code:"(\d+\.\d+\.\d+)",sdk_version:null!=/
   );
-  if (webAppVersionVariableMatch) {
-    webAppVersion = extractStringAssignment(
-      bundleText,
-      webAppVersionVariableMatch[1]
-    );
-  }
-
-  const versionTupleMatch = bundleText.match(
-    /version_name:null!=\w+\?\w+:"([^"]+)",version_code:"([^"]+)",sdk_version:null!=\w+\?\w+:([A-Za-z_$][\w$]*),effect_sdk_version:null!=\w+\?\w+:\3/
-  );
-  const sdkVersionCandidate = versionTupleMatch
-    ? extractStringAssignment(bundleText, versionTupleMatch[3])
-    : undefined;
-  const sdkVersion = isBundleVersionLike(sdkVersionCandidate)
-    ? sdkVersionCandidate
-    : undefined;
-  const versionName = versionTupleMatch?.[1];
-  const versionCode = versionTupleMatch?.[2];
-
+  const versionName = versionCode;
   const editorAppVersion =
-    extractFirst(
-      bundleText,
-      /["']device-time["'][^]*?appvr:"([^"]+\.\d+\.\d+)"/
-    ) ??
+    // 署名付きリクエストのヘッダーに直接埋め込まれるリテラルを優先する
+    extractFirst(bundleText, /appvr:"(\d+\.\d+\.\d+)"/) ??
     extractFirst(bundleText, /appvr=([0-9]+\.[0-9]+\.[0-9]+)/);
+  // cc_web 環境定数オブジェクトから Web アプリのバージョンを取る
+  const webAppVersion = extractFirst(
+    bundleText,
+    /APP_NAME:"cc_web"[^}]*?VERSION:"(\d+\.\d+\.\d+)"/
+  );
 
   const voiceCategoryIds = Array.from(
     new Set(
@@ -199,8 +184,6 @@ export const extractEditorBundleConfig = (
     webAppVersion,
     versionName,
     versionCode,
-    sdkVersion,
-    effectSdkVersion: sdkVersion,
     signRecipe,
     multiPlatformPath: extractFirst(
       bundleText,

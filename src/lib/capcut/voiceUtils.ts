@@ -29,6 +29,16 @@ const parseToneType = (
   record: Record<string, unknown> | null
 ): Record<string, unknown> | null => asRecord(record?.tonetype);
 
+const ttsEffectType = 11;
+
+// effect_type は TTS 音声が 11、ボイスエフェクト等の別素材がそれ以外になる
+// TTS 以外の素材まで話者として受け入れると合成時に TTSInvalidSpeaker で落ちるため除外する
+const isTtsEffectItem = (record: Record<string, unknown>): boolean => {
+  const effectType = record.effect_type;
+
+  return typeof effectType !== 'number' || effectType === ttsEffectType;
+};
+
 const legacySpeakerPattern = /^(?:ICL_[A-Za-z0-9_]+|BV\d+_streaming|jp_\d+)$/;
 
 /**
@@ -42,6 +52,10 @@ export const parseSpeaker = (item: unknown): Speaker | null => {
 
   const commonAttr = isRecord(item.common_attr) ? item.common_attr : null;
   if (!commonAttr) {
+    return null;
+  }
+
+  if (!isTtsEffectItem(commonAttr)) {
     return null;
   }
 

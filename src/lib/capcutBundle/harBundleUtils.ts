@@ -156,7 +156,8 @@ export const extractCapCutBundleConfigFromHarFile = async (
     }
 
     if (
-      /video_online\/static\/js\/(editor|editor-template|services-|vendors-5\.0bd5a122)|smart_tools_online\/static\/js\/(tts|tts-initial)|platform_online\/static\/js\/async\/48427/.test(
+      // bundle のファイル名ハッシュは再生成で変わるため固定しない
+      /video_online\/static\/js\/(editor|services|vendors)|smart_tools_online\/static\/js\/tts/.test(
         url
       )
     ) {
