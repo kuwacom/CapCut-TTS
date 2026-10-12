@@ -23,6 +23,7 @@ import { splitTtsText } from '@/lib/string';
 import {
   parseSpeaker,
   resolveSpeaker,
+  supportsMultiPlatformSpeaker,
   toSpeakerInfoList,
 } from '@/lib/capcut/voiceUtils';
 import { capCutVoiceCategoryIds } from '@/models/capcutVoiceCategories';
@@ -231,7 +232,7 @@ class CapCutService {
     );
     const previewFilePath = path.join(
       previewDirectoryPath,
-      `${resolvedSpeaker.speaker}.mp3`
+      `${resolvedSpeaker.speaker ?? resolvedSpeaker.resourceId}.mp3`
     );
 
     await fs.mkdir(previewDirectoryPath, { recursive: true });
@@ -244,7 +245,7 @@ class CapCutService {
 
     const previewAudio = await this.synthesizeBuffer({
       text: env.CAPCUT_SPEAKER_PREVIEW_TEXT,
-      speaker: resolvedSpeaker.speaker,
+      speaker: resolvedSpeaker.speaker ?? resolvedSpeaker.resourceId,
       type: 0,
       pitch: 10,
       speed: 10,
@@ -1194,13 +1195,18 @@ class CapCutService {
       );
       await this.ensureAuthenticated();
 
-      try {
-        return await this.createAudioViaMultiPlatform(resolvedSpeaker, options);
-      } catch (error) {
-        logger.info(
-          'CapCut multi_platform TTS failed. Falling back to editor intelligence flow',
-          { error }
-        );
+      if (supportsMultiPlatformSpeaker(resolvedSpeaker.speaker)) {
+        try {
+          return await this.createAudioViaMultiPlatform(
+            resolvedSpeaker,
+            options
+          );
+        } catch (error) {
+          logger.info(
+            'CapCut multi_platform TTS failed. Falling back to editor intelligence flow',
+            { error }
+          );
+        }
       }
 
       const session = await this.ensureAuthenticated();
@@ -1303,10 +1309,10 @@ class CapCutService {
         scene: ttsScene,
         params: JSON.stringify({
           text: options.text,
-          platform: ttsPlatform,
+          platform: resolvedSpeaker.ttsPlatform ?? ttsPlatform,
         }),
         req_json: JSON.stringify({
-          speaker: resolvedSpeaker.speaker,
+          speaker: resolvedSpeaker.speaker ?? resolvedSpeaker.resourceId,
           audio_config: {},
           disable_caption: true,
           commerce: {

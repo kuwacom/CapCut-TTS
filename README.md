@@ -141,6 +141,7 @@ http://<host>:<port>/
 [
   {
     "id": "ICL_en_female_jiaoao",
+    "speaker": "ICL_en_female_jiaoao",
     "resourceId": "7530105822785899777",
     "effectId": "7530105822785899777",
     "name": "ラベベさん",

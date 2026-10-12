@@ -41,7 +41,7 @@ paths:
         - name: speakerId
           in: path
           required: true
-          description: 話者 ID
+          description: 話者 ID。/v2/speakers の id / speaker / resourceId / effectId / speaker name を受け付けます。
           schema:
             type: string
             example: ICL_en_female_jiaoao
@@ -301,7 +301,11 @@ components:
       properties:
         id:
           type: string
-          description: 内部 speaker name
+          description: 話者 ID。基本は speaker と同じ値
+          example: ICL_en_female_jiaoao
+        speaker:
+          type: string
+          description: CapCut 内部 speaker name。存在しない音声では省略されます
           example: ICL_en_female_jiaoao
         resourceId:
           type: string
