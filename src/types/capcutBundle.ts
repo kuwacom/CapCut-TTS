@@ -11,72 +11,6 @@ export interface CapCutSignRecipe {
 }
 
 /**
- * 抽出処理で扱う bundle ソース
- */
-export interface CapCutBundleSource {
-  url: string;
-  text: string;
-  sourceType: 'har' | 'live';
-}
-
-/**
- * bundle 抽出で見つかった version 群
- */
-export interface CapCutBundleVersionInfo {
-  accountApiVersion?: string;
-  loginSdkVersion?: string;
-  webAppVersion?: string;
-  editorAppVersion?: string;
-  versionName?: string;
-  versionCode?: string;
-  sdkVersion?: string;
-  effectSdkVersion?: string;
-}
-
-/**
- * bundle 抽出で見つかった endpoint 群
- */
-export interface CapCutBundleEndpointInfo {
-  loginEmailPath?: string;
-  loginUserPath?: string;
-  regionPath?: string;
-  accountInfoPath?: string;
-  workspacePath?: string;
-  voiceListPath?: string;
-  homepageEffectListPath?: string;
-  multiPlatformTtsPath?: string;
-  createTtsTaskPath?: string;
-  queryTtsTaskPath?: string;
-}
-
-/**
- * bundle 抽出で見つかった署名関連設定
- */
-export interface CapCutBundleSignInfo {
-  prefix?: string;
-  suffix?: string;
-  pathSliceLength?: number;
-  platformId?: string;
-  signVersion?: string;
-  appVersionCandidates: string[];
-}
-
-/**
- * login bundle から得られる設定
- */
-export interface CapCutLoginBundleConfig {
-  accountBundleUrl?: string;
-  sdkVersion?: string;
-  xorKey?: number;
-  emailHashSalt?: string;
-  supportsVerifyFp?: boolean;
-  emailLoginPath?: string;
-  userLoginPath?: string;
-  regionPath?: string;
-  accountInfoPath?: string;
-}
-
-/**
  * editor bundle から得られる設定
  */
 export interface CapCutEditorBundleConfig {
@@ -93,8 +27,6 @@ export interface CapCutEditorBundleConfig {
   queryTaskPath?: string;
   workspacePath?: string;
   voiceListPath?: string;
-  homepageEffectListPath?: string;
-  voicePanel?: string;
   voicePanelSource?: string;
   voiceCategoryIds?: number[];
 }
@@ -104,28 +36,5 @@ export interface CapCutEditorBundleConfig {
  */
 export interface CapCutBundleConfig {
   discoveredAt: number;
-  login: CapCutLoginBundleConfig;
   editor: CapCutEditorBundleConfig;
-}
-
-/**
- * bundle 抽出結果
- */
-export interface CapCutBundleExtractionResult {
-  generatedAt: string;
-  sources: string[];
-  versions: CapCutBundleVersionInfo;
-  sign: CapCutBundleSignInfo;
-  endpoints: CapCutBundleEndpointInfo;
-  auth: {
-    passwordEncoding?: 'xor5hex';
-    hasMixMode?: boolean;
-    hasFixedMixMode?: boolean;
-    csrfCookieNames: string[];
-  };
-  voice: {
-    categoryIds: number[];
-    categoryIdsFromApiResponses: number[];
-  };
-  notes: string[];
 }

@@ -43,10 +43,6 @@ const mergeBundleConfig = (
   next: CapCutBundleConfig
 ): CapCutBundleConfig => ({
   discoveredAt: Math.max(current.discoveredAt, next.discoveredAt),
-  login: {
-    ...current.login,
-    ...next.login,
-  },
   editor: {
     ...current.editor,
     ...next.editor,
@@ -77,7 +73,6 @@ const run = async () => {
 
   let mergedConfig: CapCutBundleConfig = {
     discoveredAt: 0,
-    login: {},
     editor: {
       sourceUrls: [],
     },

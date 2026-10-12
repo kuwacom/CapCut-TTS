@@ -6,9 +6,7 @@ import {
 } from '@/lib/capcutBundle/bundleExtractionUtils';
 import {
   extractEditorBundleConfig,
-  extractLoginBundleConfig,
   mergeEditorBundleConfig,
-  mergeLoginBundleConfig,
 } from '@/lib/capcutBundle/bundleExtractors';
 import logger from '@/services/logger';
 import type { ApiRequester } from '@/types/api';
@@ -18,7 +16,6 @@ const bundleCacheTtlMs = 30 * 60 * 1000;
 
 const defaultBundleConfig = (): CapCutBundleConfig => ({
   discoveredAt: 0,
-  login: {},
   editor: {
     sourceUrls: [],
   },
@@ -31,15 +28,9 @@ const toAbsoluteUrl = (url: string) =>
  * CapCut の live bundle から設定値を抽出してキャッシュする
  */
 class CapCutBundleService {
-  private loginBundleConfig: CapCutBundleConfig['login'] | null = null;
-
   private editorBundleConfig: CapCutBundleConfig['editor'] | null = null;
 
-  private loginBundleDiscoveredAt = 0;
-
   private editorBundleDiscoveredAt = 0;
-
-  private loginBundlePromise: Promise<CapCutBundleConfig['login']> | null = null;
 
   private editorBundlePromise: Promise<CapCutBundleConfig['editor']> | null = null;
 
@@ -52,30 +43,6 @@ class CapCutBundleService {
       /^\d+\.\d+\.\d+(?:-[A-Za-z0-9._-]+)?$/.test(config.editorAppVersion) &&
       (config.signRecipe?.pathTailLength ?? 0) >= 7
     );
-  }
-
-  /**
-   * login bundle 設定を返す
-   */
-  async resolveLoginBundleConfig() {
-    await this.loadBundleConfigFromFile();
-
-    if (
-      this.loginBundleConfig &&
-      Date.now() - this.loginBundleDiscoveredAt < bundleCacheTtlMs
-    ) {
-      return this.loginBundleConfig;
-    }
-
-    if (this.loginBundlePromise) {
-      return this.loginBundlePromise;
-    }
-
-    this.loginBundlePromise = this.fetchLoginBundleConfig().finally(() => {
-      this.loginBundlePromise = null;
-    });
-
-    return this.loginBundlePromise;
   }
 
   /**
@@ -113,7 +80,7 @@ class CapCutBundleService {
    * 抽出済み設定ファイルがあれば読み込む
    */
   private async loadBundleConfigFromFile() {
-    if (this.loginBundleConfig || this.editorBundleConfig) {
+    if (this.editorBundleConfig) {
       return;
     }
 
@@ -121,9 +88,7 @@ class CapCutBundleService {
       const raw = await fs.readFile(env.CAPCUT_BUNDLE_CONFIG_PATH, 'utf8');
       const parsed = JSON.parse(raw) as CapCutBundleConfig;
 
-      this.loginBundleConfig = parsed.login;
       this.editorBundleConfig = parsed.editor;
-      this.loginBundleDiscoveredAt = parsed.discoveredAt;
       this.editorBundleDiscoveredAt = parsed.discoveredAt;
 
       logger.info('CapCut bundle config loaded from file', {
@@ -148,11 +113,7 @@ class CapCutBundleService {
    */
   private async persistBundleConfig() {
     const currentConfig: CapCutBundleConfig = {
-      discoveredAt: Math.max(
-        this.loginBundleDiscoveredAt,
-        this.editorBundleDiscoveredAt
-      ),
-      login: this.loginBundleConfig ?? defaultBundleConfig().login,
+      discoveredAt: this.editorBundleDiscoveredAt,
       editor: this.editorBundleConfig ?? defaultBundleConfig().editor,
     };
 
@@ -170,65 +131,6 @@ class CapCutBundleService {
       });
     } catch (error) {
       logger.warn('Failed to save CapCut bundle config file', { error });
-    }
-  }
-
-  /**
-   * login ページから account bundle を辿って抽出する
-   */
-  private async fetchLoginBundleConfig() {
-    try {
-      const response = await fetch(
-        `${env.CAPCUT_WEB_URL}/${env.CAPCUT_PAGE_LOCALE}/login`,
-        {
-          headers: {
-            'User-Agent': env.USER_AGENT,
-            Accept:
-              'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-          },
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(
-          `Failed to fetch login page: ${response.status} ${response.statusText}`
-        );
-      }
-
-      const html = await response.text();
-      const scriptUrls = extractScriptUrlsFromHtml(html)
-        .map(toAbsoluteUrl)
-        .filter((url) => url.includes('npm.byted-sdk.account-api'));
-
-      let loginConfig = defaultBundleConfig().login;
-
-      for (const scriptUrl of scriptUrls) {
-        const scriptResponse = await fetch(scriptUrl, {
-          headers: {
-            'User-Agent': env.USER_AGENT,
-            Accept: '*/*',
-          },
-        });
-
-        if (!scriptResponse.ok) {
-          continue;
-        }
-
-        const bundleText = await scriptResponse.text();
-        loginConfig = mergeLoginBundleConfig(
-          loginConfig,
-          extractLoginBundleConfig(bundleText, scriptUrl)
-        );
-      }
-
-      this.loginBundleConfig = loginConfig;
-      this.loginBundleDiscoveredAt = Date.now();
-      await this.persistBundleConfig();
-      logger.info('CapCut login bundle config extracted', loginConfig);
-      return loginConfig;
-    } catch (error) {
-      logger.warn('Failed to extract CapCut login bundle config', { error });
-      return this.loginBundleConfig ?? defaultBundleConfig().login;
     }
   }
 

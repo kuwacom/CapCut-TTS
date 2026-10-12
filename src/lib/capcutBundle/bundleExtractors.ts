@@ -1,11 +1,9 @@
 import type {
   CapCutEditorBundleConfig,
-  CapCutLoginBundleConfig,
   CapCutSignRecipe,
 } from '@/types/capcutBundle';
 import {
   extractFirst,
-  extractStringAssignment,
 } from '@/lib/capcutBundle/bundleExtractionUtils';
 
 const mergeSignRecipe = (
@@ -39,84 +37,6 @@ const preferLongerPath = (
   }
 
   return next.length >= current.length ? next : current;
-};
-
-const withPassportWebPrefix = (path: string | undefined) => {
-  if (!path) {
-    return undefined;
-  }
-
-  if (path.startsWith('/passport/')) {
-    return path;
-  }
-
-  return `/passport/web${path}`;
-};
-
-const extractPathWithBaseVariable = (text: string, key: string) => {
-  const match = text.match(
-    new RegExp(`${key}:([A-Za-z_$][\\w$]*)\\+"([^"]+)"`)
-  );
-
-  if (!match) {
-    return undefined;
-  }
-
-  const basePath = extractStringAssignment(text, match[1]);
-  return basePath ? `${basePath}${match[2]}` : match[2];
-};
-
-/**
- * login/account bundle から抽出可能な設定を抜く
- */
-export const extractLoginBundleConfig = (
-  bundleText: string,
-  bundleUrl?: string
-): CapCutLoginBundleConfig => {
-  const sdkVersion =
-    extractFirst(bundleText, /sdk_version:"([^"]+)"/) ??
-    extractFirst(bundleText, /sdk_version:"([^"]+-tiktok)"/);
-  const xorKeyMatch = bundleText.match(
-    /\((\d+)\^[A-Za-z_$][\w$]*\[[A-Za-z_$][\w$]*\]\)\.toString\(16\)/
-  );
-
-  const emailLoginPath = withPassportWebPrefix(
-    extractPathWithBaseVariable(bundleText, 'EMAIL_LOGIN')
-  );
-  const userLoginPath = withPassportWebPrefix(
-    extractPathWithBaseVariable(bundleText, 'PWD_LOGIN')
-  );
-  const regionPath =
-    withPassportWebPrefix(
-      extractPathWithBaseVariable(bundleText, 'REGION') ??
-        extractPathWithBaseVariable(bundleText, 'REGION_ALERT')
-    ) ??
-    extractFirst(bundleText, /["'](\/passport\/web\/region\/)["']/);
-  const accountInfoPath = withPassportWebPrefix(
-    extractPathWithBaseVariable(bundleText, 'ACCOUNT_INFO') ??
-      extractFirst(bundleText, /["'](\/passport\/web\/account\/info\/)["']/)
-  );
-  const emailHashSalt =
-    extractFirst(
-      bundleText,
-      /hashed_id[^A-Za-z0-9_-]+["'`]([A-Za-z0-9_-]{24,})["'`]/
-    ) ??
-    extractFirst(
-      bundleText,
-      /sha256[^A-Za-z0-9_-]+["'`]([A-Za-z0-9_-]{24,})["'`]/
-    );
-
-  return {
-    ...(bundleUrl ? { accountBundleUrl: bundleUrl } : {}),
-    sdkVersion,
-    xorKey: xorKeyMatch ? Number(xorKeyMatch[1]) : undefined,
-    emailHashSalt,
-    supportsVerifyFp: bundleText.includes('verifyFp'),
-    emailLoginPath,
-    userLoginPath,
-    regionPath,
-    accountInfoPath,
-  };
 };
 
 /**
@@ -178,6 +98,7 @@ export const extractEditorBundleConfig = (
     )
   );
 
+  // homepageEffectListPath は現行 bundle から抽出できても消費者がないため保持しない
   return {
     sourceUrls: bundleUrl ? [bundleUrl] : [],
     editorAppVersion,
@@ -209,16 +130,6 @@ export const extractEditorBundleConfig = (
         bundleText,
         /GET_HEYCAN_RESOURCES_BY_CATEGORY_ID:\{[^}]*url:"([^"]+)"/
       ) ?? extractFirst(bundleText, /GET_CATEGORY_RESOURCE:"([^"]+)"/),
-    homepageEffectListPath:
-      extractFirst(bundleText, /GET_HOMEPAGE_EFFECT_LIST:"([^"]+)"/) ??
-      extractFirst(
-        bundleText,
-        /["'](\/artist\/v1\/homepage\/get_effect_list)["']/
-      ),
-    voicePanel:
-      bundleText.includes('o.Tone="tone"') || bundleText.includes('panel:"tone"')
-        ? 'tone'
-        : undefined,
     voicePanelSource: bundleText.includes('heycan') ? 'heycan' : undefined,
     voiceCategoryIds,
   };
@@ -247,11 +158,6 @@ export const mergeEditorBundleConfig = (
   queryTaskPath: preferLongerPath(current.queryTaskPath, next.queryTaskPath),
   workspacePath: preferLongerPath(current.workspacePath, next.workspacePath),
   voiceListPath: preferLongerPath(current.voiceListPath, next.voiceListPath),
-  homepageEffectListPath: preferLongerPath(
-    current.homepageEffectListPath,
-    next.homepageEffectListPath
-  ),
-  voicePanel: next.voicePanel ?? current.voicePanel,
   voicePanelSource: next.voicePanelSource ?? current.voicePanelSource,
   voiceCategoryIds:
     next.voiceCategoryIds && next.voiceCategoryIds.length > 0
@@ -261,20 +167,3 @@ export const mergeEditorBundleConfig = (
       : current.voiceCategoryIds,
 });
 
-/**
- * login 設定を後勝ちでマージする
- */
-export const mergeLoginBundleConfig = (
-  current: CapCutLoginBundleConfig,
-  next: CapCutLoginBundleConfig
-): CapCutLoginBundleConfig => ({
-  accountBundleUrl: next.accountBundleUrl ?? current.accountBundleUrl,
-  sdkVersion: next.sdkVersion ?? current.sdkVersion,
-  xorKey: next.xorKey ?? current.xorKey,
-  emailHashSalt: next.emailHashSalt ?? current.emailHashSalt,
-  supportsVerifyFp: next.supportsVerifyFp ?? current.supportsVerifyFp,
-  emailLoginPath: next.emailLoginPath ?? current.emailLoginPath,
-  userLoginPath: next.userLoginPath ?? current.userLoginPath,
-  regionPath: next.regionPath ?? current.regionPath,
-  accountInfoPath: next.accountInfoPath ?? current.accountInfoPath,
-});

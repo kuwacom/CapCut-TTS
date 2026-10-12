@@ -2,13 +2,10 @@ import fs from 'node:fs/promises';
 import type {
   CapCutBundleConfig,
   CapCutEditorBundleConfig,
-  CapCutLoginBundleConfig,
 } from '@/types/capcutBundle';
 import {
   extractEditorBundleConfig,
-  extractLoginBundleConfig,
   mergeEditorBundleConfig,
-  mergeLoginBundleConfig,
 } from '@/lib/capcutBundle/bundleExtractors';
 
 interface HarEntry {
@@ -49,7 +46,6 @@ export const extractCapCutBundleConfigFromHarFile = async (
   const har = JSON.parse(raw) as HarFile;
   const entries = har.log?.entries ?? [];
 
-  let login: CapCutLoginBundleConfig = {};
   let editor: CapCutEditorBundleConfig = { sourceUrls: [] };
 
   for (const entry of entries) {
@@ -150,11 +146,6 @@ export const extractCapCutBundleConfigFromHarFile = async (
       continue;
     }
 
-    if (url.includes('npm.byted-sdk.account-api')) {
-      login = mergeLoginBundleConfig(login, extractLoginBundleConfig(text, url));
-      continue;
-    }
-
     if (
       // bundle のファイル名ハッシュは再生成で変わるため固定しない
       /video_online\/static\/js\/(editor|services|vendors)|smart_tools_online\/static\/js\/tts/.test(
@@ -171,7 +162,6 @@ export const extractCapCutBundleConfigFromHarFile = async (
 
   return {
     discoveredAt: Date.now(),
-    login,
     editor,
   };
 };
