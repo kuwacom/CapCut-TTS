@@ -896,7 +896,15 @@ class CapCutService {
 
     try {
       const speakers = await this.requestSpeakerList();
-      this.speakers = speakers.length > 0 ? speakers : fallbackSpeakers;
+      // is_vip は無料で使える声にも付いているため除外条件には使えない
+      // 実機検証で TTSDeductFailed になるのは 11labs 連携の VIP 声だけなのでその組み合わせだけ外す
+      const usableSpeakers = env.CAPCUT_EXCLUDE_VIP_VOICES
+        ? speakers.filter(
+            (speaker) => !(speaker.isVip && speaker.ttsPlatform === 2)
+          )
+        : speakers;
+      this.speakers =
+        usableSpeakers.length > 0 ? usableSpeakers : fallbackSpeakers;
       this.speakersLoadedAt = Date.now();
       return this.speakers;
     } catch (error) {

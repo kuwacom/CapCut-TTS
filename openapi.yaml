@@ -262,12 +262,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiErrorResponse'
-        '503':
-          description: legacy endpoint に必要な環境変数が未設定の場合
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorResponse'
 
 components:
   schemas:
@@ -326,6 +320,10 @@ components:
         language:
           type: string
           example: en
+        isVip:
+          type: boolean
+          description: CapCut 側の VIP フラグ。無料で使える音声にも付いていることがある
+          example: true
     SynthesizeRequest:
       type: object
       required:

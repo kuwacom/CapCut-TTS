@@ -22,6 +22,7 @@ export interface Speaker {
   effectId: string;
   resourceId: string;
   ttsPlatform?: number;
+  isVip?: boolean;
   style?: string;
   language?: string;
 }
@@ -38,6 +39,7 @@ export interface SpeakerInfo {
   description: string;
   style: string;
   language: string;
+  isVip: boolean;
 }
 
 /**

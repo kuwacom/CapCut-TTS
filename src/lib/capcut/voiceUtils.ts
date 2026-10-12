@@ -100,6 +100,7 @@ export const parseSpeaker = (item: unknown): Speaker | null => {
     effectId,
     resourceId,
     ...(tonePlatform === '11labs' ? { ttsPlatform: 2 } : {}),
+    ...(extra?.is_vip === true ? { isVip: true } : {}),
     style: '',
     language: speaker ? envLanguageFromSpeaker(speaker) : 'unknown',
   };
@@ -138,6 +139,7 @@ export const toSpeakerInfoList = (speakers: Speaker[]): SpeakerInfo[] => {
         (resolvedSpeaker.speaker
           ? envLanguageFromSpeaker(resolvedSpeaker.speaker)
           : 'unknown'),
+      isVip: resolvedSpeaker.isVip ?? false,
     }));
 };
 

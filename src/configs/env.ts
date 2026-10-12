@@ -19,6 +19,26 @@ const booleanFlag = z.preprocess(
   z.enum(['true', 'false']).transform((value) => value === 'true')
 );
 
+// 未設定時を false として扱う boolean フラグ
+// 既存の booleanFlag は未設定時に true になるため除外系の設定には使えない
+const optionalBooleanFlag = z.preprocess(
+  (value) => {
+    if (value === undefined || value === '') {
+      return undefined;
+    }
+
+    if (typeof value === 'boolean') {
+      return value ? 'true' : 'false';
+    }
+
+    return String(value).toLowerCase();
+  },
+  z
+    .enum(['true', 'false'])
+    .transform((value) => value === 'true')
+    .optional()
+);
+
 const logLevelSchema = z
   .enum(['silly', 'trace', 'debug', 'info', 'warn', 'error', 'fatal'])
   .default('info');
@@ -68,6 +88,7 @@ const envSchema = z
       .number()
       .positive()
       .default(14),
+    CAPCUT_EXCLUDE_VIP_VOICES: optionalBooleanFlag,
     CAPCUT_TTS_TEXT_CHUNK_MAX_LENGTH: z.coerce
       .number()
       .int()

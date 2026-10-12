@@ -74,7 +74,8 @@ curl -X POST "http://localhost:8080/v2/synthesize" \
   --output voice.mp3
 ```
 
-旧フローは、そのまま次のように呼び出せます。`LEGACY_DEVICE_TIME` と `LEGACY_SIGN` は省略可能で、未設定の場合は自動生成した署名を使います。
+旧フローは `LEGACY_DEVICE_TIME` と `LEGACY_SIGN` 未設定でも動作します。
+設定した場合は、その静的な署名ヘッダーを優先します。
 
 ```bash
 curl "http://localhost:8080/v1/synthesize?text=こんにちは&type=0&pitch=10&speed=10&volume=10&method=buffer" --output voice.wav
@@ -147,10 +148,13 @@ http://<host>:<port>/
     "name": "ラベベさん",
     "description": "英語の明るい女性ボイス",
     "style": "",
-    "language": "en"
+    "language": "en",
+    "isVip": true
   }
 ]
 ```
+
+`isVip` は CapCut 側の VIP フラグです。`CAPCUT_EXCLUDE_VIP_VOICES=true` にすると、VIP のうち 11labs 連携の音声だけを一覧から除外します。`isVip` は無料で使える声にも付いているため、除外対象にはなりません。
 
 ### `GET /v2/speakers/:speakerId/preview`
 
@@ -191,7 +195,7 @@ GET と同じフィールドを JSON body で送信します。
 | `502 Bad Gateway` | CapCut 側の認証または音声生成に失敗 |
 
 `/v1/synthesize` は旧 token + websocket フローを使い、`audio/wav` を返します。  
-`LEGACY_DEVICE_TIME` と `LEGACY_SIGN` は省略可能で、未設定の場合は自動生成した署名を使います。
+`LEGACY_DEVICE_TIME` と `LEGACY_SIGN` が未設定の場合は、API 署名を動的に再生成します。
 
 ### 話者解決ルール
 
@@ -253,8 +257,8 @@ GET と同じフィールドを JSON body で送信します。
 | `CAPCUT_TTS_TEXT_CHUNK_BOUNDARY_SEARCH_RATIO` | 区切り文字を探し始める位置の割合 |
 | `LEGACY_CAPCUT_API_URL` | 旧 token API のベース URL |
 | `LEGACY_BYTEINTL_API_URL` | 旧 WebSocket 接続先のベース URL |
-| `LEGACY_DEVICE_TIME` | 旧 token API に送る Device-Time。省略時は自動生成 |
-| `LEGACY_SIGN` | 旧 token API に送る Sign。省略時は自動生成 |
+| `LEGACY_DEVICE_TIME` | 旧 token API に送る Device-Time。未設定時は動的署名 |
+| `LEGACY_SIGN` | 旧 token API に送る Sign。未設定時は動的署名 |
 | `LEGACY_TOKEN_INTERVAL` | legacy token の再取得間隔。単位は時間 |
 | `USER_AGENT` | CapCut へ送る User-Agent |
 | `SESSION_REFRESH_INTERVAL_MINUTES` | background session validation 間隔 |
@@ -277,6 +281,6 @@ GET と同じフィールドを JSON body で送信します。
 
 - 起動時に session の warmup を試み、その後は `SESSION_REFRESH_INTERVAL_MINUTES` ごとに検証します
 - 起動時や実行時に bundle 情報が必要になると、`capcut-bundle-config.json` を読み込み、必要に応じて live 抽出して更新します
-- `LEGACY_DEVICE_TIME` と `LEGACY_SIGN` は省略可能で、起動時に legacy token の取得も試みます
+- 起動時に legacy token の取得も試みます
 - `speaker` に `effectId` / `resourceId` / speaker name を直接渡しても選択できます
 - 現在の CapCut Web TTS は MP3 を返し、レスポンスの `Content-Disposition` は `inline` です

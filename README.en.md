@@ -147,10 +147,13 @@ http://<host>:<port>/
     "name": "Ms. Labebe",
     "description": "Bright English female voice",
     "style": "",
-    "language": "en"
+    "language": "en",
+    "isVip": true
   }
 ]
 ```
+
+`isVip` mirrors CapCut's own VIP flag. When `CAPCUT_EXCLUDE_VIP_VOICES=true`, only VIP voices backed by the 11labs integration are removed from the list. `isVip` is also set on voices that work on free accounts, so they are not excluded.
 
 ### `GET /v2/speakers/:speakerId/preview`
 

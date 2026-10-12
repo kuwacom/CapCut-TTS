@@ -165,34 +165,30 @@ class LegacyCapCutService {
    * 旧 token API を叩く
    */
   private async fetchToken(): Promise<LegacyGetTokenResponse> {
+    const url = new URL(`${env.LEGACY_CAPCUT_API_URL}/common/tts/token`);
+    const hasStaticSign = Boolean(env.LEGACY_DEVICE_TIME && env.LEGACY_SIGN);
+    const { sign, deviceTime } = createEditApiSignature(
+      url.toString(),
+      LEGACY_PLATFORM,
+      LEGACY_CAPCUT_APP_VERSION,
+      ''
+    );
+
     const response = await fetch(
-      `${env.LEGACY_CAPCUT_API_URL}/common/tts/token`,
+      url,
       {
         method: 'POST',
-        headers: (() => {
-          const url = new URL('/common/tts/token', env.LEGACY_CAPCUT_API_URL);
-          const hasStaticSign = Boolean(
-            env.LEGACY_DEVICE_TIME && env.LEGACY_SIGN
-          );
-          const { sign, deviceTime } = createEditApiSignature(
-            url.toString(),
-            LEGACY_PLATFORM,
-            LEGACY_CAPCUT_APP_VERSION,
-            ''
-          );
-
-          return new Headers({
-            Appvr: LEGACY_CAPCUT_APP_VERSION,
-            'Device-Time': hasStaticSign
-              ? env.LEGACY_DEVICE_TIME ?? ''
-              : deviceTime,
-            Origin: env.CAPCUT_WEB_URL,
-            Pf: LEGACY_PLATFORM,
-            Sign: hasStaticSign ? env.LEGACY_SIGN ?? '' : sign,
-            'Sign-Ver': LEGACY_SIGN_VERSION,
-            'User-Agent': env.USER_AGENT,
-          });
-        })(),
+        headers: new Headers({
+          Appvr: LEGACY_CAPCUT_APP_VERSION,
+          'Device-Time': hasStaticSign
+            ? env.LEGACY_DEVICE_TIME ?? ''
+            : deviceTime,
+          Origin: env.CAPCUT_WEB_URL,
+          Pf: LEGACY_PLATFORM,
+          Sign: hasStaticSign ? env.LEGACY_SIGN ?? '' : sign,
+          'Sign-Ver': LEGACY_SIGN_VERSION,
+          'User-Agent': env.USER_AGENT,
+        }),
         signal: AbortSignal.timeout(LEGACY_TOKEN_REQUEST_TIMEOUT_MS),
       }
     );

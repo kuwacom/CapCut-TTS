@@ -225,6 +225,17 @@ md5("9e2c|<path末尾7文字>|7|<appvr>|<device-time>|<tdid>|11ac")
 - `appvr` は 2026-10 の editor bundle 実測で `5.8.0`
   - live bundle から動的に抽出し、取れない場合は定数 `5.8.0` をフォールバックに使う
 
+### legacy token endpoint
+
+`/lv/v1/common/tts/token` も上記の式で署名できる。
+
+- `appvr` は `5.8.0`
+- `pf` は `7`
+- `tdid` は空文字で通る
+- `device-time` はリクエスト時刻でよい
+
+静的な `LEGACY_DEVICE_TIME` / `LEGACY_SIGN` があっても使えるが、無い場合でも動的に再生成できる。
+
 ## 9. セッション失効と rate limit
 
 ### 観測した失敗
