@@ -107,7 +107,7 @@
 
 - 現状の第一候補は `POST /storyboard/v1/tts/multi_platform`
 - 第二候補として `POST /lv/v2/intelligence/create` と `POST /lv/v2/intelligence/query`
-- 音声モデルは `POST /artist/v1/effect/get_resources_by_category_id`
+- 音声モデルは `POST /artist/v1/panel/get_panel_info` で一括取得し、失敗時は `POST /artist/v1/effect/get_resources_by_category_id` へフォールバックする
 
 ## 注意
 

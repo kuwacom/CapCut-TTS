@@ -100,7 +100,19 @@ POST /lv/v2/intelligence/query
 
 ## 4. 音声モデル取得
 
-### 共通 endpoint
+### 第一経路: panel 一括取得
+
+```text
+POST /artist/v1/panel/get_panel_info
+```
+
+body は `panel: "tone"`、`panel_source: "heycan"`、`get_all_resource: true` を送る
+
+1 リクエストでカテゴリ一覧と各カテゴリの音声リソースをまとめて取得できる
+
+### フォールバック: カテゴリ別取得
+
+panel API が失敗した場合のみ、次のカテゴリ別 API を使う
 
 ```text
 POST /artist/v1/effect/get_resources_by_category_id
@@ -134,7 +146,9 @@ POST /artist/v1/effect/get_resources_by_category_id
 
 ## 5. 全カテゴリ
 
-`tmp/www.capcut.com-音声-カテゴリ-全て.har` から、少なくとも次のカテゴリ取得通信を確認しました
+第一経路の panel API はカテゴリ一覧を動的に返すため、現行実装では固定カテゴリ一覧に依存せず、36 以上のカテゴリを扱えます(2026-10-13 実測で約 310 件の話者)
+
+以下はフォールバック経路で使うカテゴリ定数で、`tmp/www.capcut.com-音声-カテゴリ-全て.har` から確認できた 11 件です
 
 - `30316`
 - `2037708790`
@@ -147,7 +161,7 @@ POST /artist/v1/effect/get_resources_by_category_id
 - `33083`
 - `33085`
 
-現在の実装では、これらを全件取得して 1 つの音声モデル一覧へ統合しています
+panel API が失敗した場合のみ、これらを全件取得して 1 つの音声モデル一覧へ統合します
 
 ## 6. speaker と resource_id
 
@@ -173,13 +187,17 @@ HAR では `extra` または `biz_extra` 内の `tonetype` に voice_type が埋
 
 通常は `common_attr` 側から取得できる
 
+なお、`common_attr.effect_type` が数値で `11` 以外の項目(ボイスエフェクト等)は、話者一覧から除外される
+
+除外された `resourceId` を `speaker` に指定した場合は、デフォルト話者にフォールバックして合成される
+
 ## 7. `type` の後方互換
 
 もともとのこのプロジェクトは `type=<数字>` で音声を切り替えていたため、現在もその互換を維持しています
 
 ### 現在の解決順
 
-1. `voice` が明示されていればそちらを優先
+1. `speaker` が明示されていればそちらを優先
 2. `type` が数値なら旧来の index として扱う
 3. `type` が数値文字列なら旧来の index として扱う
 4. `type` が文字列なら次を順に照合する
@@ -215,13 +233,13 @@ HAR では `extra` または `biz_extra` 内の `tonetype` に voice_type が埋
 ## 9. 現行実装との対応
 
 - `src/models/capcutVoiceCategories.ts`
-  全カテゴリ一覧
-- `src/models/capcutVoiceModels.ts`
+  フォールバック経路で使うカテゴリ定数
+- `src/models/capcutSpeakers.ts`
   既知フォールバック音声と alias
 - `src/lib/capcut/voiceUtils.ts`
   voice item の変換、モデル一覧化、`type` 解決
 - `src/services/CapCutService.ts`
-  全カテゴリ取得と TTS 実行の orchestration
+  音声カタログ取得(panel 第一経路とカテゴリ別フォールバック)と TTS 実行の orchestration
 
 ## 10. 旧フローとの違い
 

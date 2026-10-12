@@ -222,9 +222,8 @@ md5("9e2c|<path末尾7文字>|7|<appvr>|<device-time>|<tdid>|11ac")
 
 - `did` は `_tea_web_id` を使う
 - `tdid` は空でも通る経路があるが、HAR では値ありのケースもあった
-- `appvr` は endpoint ごとに異なる
-  - workspace 取得では `5.8.0`
-  - TTS 実行では `8.4.0`
+- `appvr` は 2026-10 の editor bundle 実測で `5.8.0`
+  - live bundle から動的に抽出し、取れない場合は定数 `5.8.0` をフォールバックに使う
 
 ## 9. セッション失効と rate limit
 

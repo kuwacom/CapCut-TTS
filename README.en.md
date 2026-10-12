@@ -74,7 +74,7 @@ curl -X POST "http://localhost:8080/v2/synthesize" \
   --output voice.mp3
 ```
 
-If you want to use the old flow, configure `LEGACY_DEVICE_TIME` and `LEGACY_SIGN` and call:
+You can call the old flow directly. `LEGACY_DEVICE_TIME` and `LEGACY_SIGN` are optional; when not set, an automatically generated signature is used.
 
 ```bash
 curl "http://localhost:8080/v1/synthesize?text=Hello&type=0&pitch=10&speed=10&volume=10&method=buffer" --output voice.wav
@@ -191,7 +191,7 @@ Send the same fields as the GET query parameters in JSON.
 | `502 Bad Gateway` | Authentication or synthesis failed on the CapCut side |
 
 `/v1/synthesize` uses the old token + websocket flow and returns `audio/wav`.  
-If `LEGACY_DEVICE_TIME` and `LEGACY_SIGN` are not configured, it returns `503 Service Unavailable`.
+`LEGACY_DEVICE_TIME` and `LEGACY_SIGN` are optional; when not set, an automatically generated signature is used.
 
 ### Speaker Resolution Rules
 
@@ -245,7 +245,6 @@ Main environment variables are listed below.
 | `CAPCUT_DEVICE_ID` | Set this if you want to fix the device id |
 | `CAPCUT_VERIFY_FP` | Set this if you want to fix verifyFp |
 | `CAPCUT_BUNDLE_CONFIG_PATH` | Path for the persisted bundle config cache |
-| `CAPCUT_VOICE_CATEGORY_ID` | Category id used when fetching the voice catalog |
 | `CAPCUT_SESSION_STORE_PATH` | Session persistence path |
 | `CAPCUT_SPEAKER_PREVIEW_TEMP_DIR` | Directory used to cache speaker preview audio |
 | `CAPCUT_SPEAKER_PREVIEW_TEXT` | Text used to generate preview audio |
@@ -254,8 +253,8 @@ Main environment variables are listed below.
 | `CAPCUT_TTS_TEXT_CHUNK_BOUNDARY_SEARCH_RATIO` | Ratio where boundary search starts inside each TTS chunk |
 | `LEGACY_CAPCUT_API_URL` | Base URL for the old token API |
 | `LEGACY_BYTEINTL_API_URL` | Base URL for the old websocket endpoint |
-| `LEGACY_DEVICE_TIME` | Device-Time sent to the old token API |
-| `LEGACY_SIGN` | Sign sent to the old token API |
+| `LEGACY_DEVICE_TIME` | Device-Time sent to the old token API. Auto-generated when omitted |
+| `LEGACY_SIGN` | Sign sent to the old token API. Auto-generated when omitted |
 | `LEGACY_TOKEN_INTERVAL` | Legacy token refresh interval in hours |
 | `USER_AGENT` | User-Agent sent to CapCut |
 | `SESSION_REFRESH_INTERVAL_MINUTES` | Background session validation interval |
@@ -278,6 +277,6 @@ Main environment variables are listed below.
 
 - The server attempts a session warmup on startup and validates it every `SESSION_REFRESH_INTERVAL_MINUTES`
 - When bundle settings are needed, the server loads `capcut-bundle-config.json` first and refreshes it through live extraction only when necessary
-- When `LEGACY_DEVICE_TIME` and `LEGACY_SIGN` are set, the server also warms up the legacy token flow on startup
+- `LEGACY_DEVICE_TIME` and `LEGACY_SIGN` are optional, and the server also warms up the legacy token flow on startup
 - You can also pass `effectId`, `resourceId`, or speaker name directly to `speaker`
 - The current CapCut Web TTS returns MP3, and the response `Content-Disposition` is `inline`
