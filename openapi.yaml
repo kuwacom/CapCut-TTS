@@ -96,7 +96,7 @@ paths:
         - name: pitch
           in: query
           required: false
-          description: 旧互換パラメーター。現在の Web TTS では未使用です
+          description: v1 互換パラメーター。現在の Web TTS では未使用です
           schema:
             type: integer
             default: 10
@@ -177,25 +177,25 @@ paths:
                 $ref: '#/components/schemas/ApiErrorResponse'
   /v1/models:
     get:
-      summary: 旧音声モデル一覧
-      description: 旧 v1 の type 番号に対応する音声モデル一覧を返します。
+      summary: v1 音声モデル一覧
+      description: v1 の type 番号に対応する音声モデル一覧を返します。
       tags:
-        - Legacy
+        - V1
       responses:
         '200':
-          description: 旧音声モデル一覧の取得に成功した場合
+          description: v1 音声モデル一覧の取得に成功した場合
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/LegacyModel'
+                  $ref: '#/components/schemas/V1Model'
   /v1/synthesize:
     get:
-      summary: 旧音声合成
-      description: 旧 token + websocket フローを使って WAV 音声を返します。
+      summary: v1 音声合成
+      description: token + WebSocket フローを使って WAV 音声を返します。
       tags:
-        - Legacy
+        - V1
       parameters:
         - name: text
           in: query
@@ -207,7 +207,7 @@ paths:
         - name: type
           in: query
           required: false
-          description: legacy voice index
+          description: v1 voice index
           schema:
             type: integer
             default: 0
@@ -257,7 +257,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiErrorResponse'
         '502':
-          description: CapCut 側の legacy 音声生成に失敗した場合
+          description: CapCut 側の v1 音声生成に失敗した場合
           content:
             application/json:
               schema:
@@ -358,7 +358,7 @@ components:
             - buffer
             - stream
           default: buffer
-    LegacyModel:
+    V1Model:
       type: object
       required:
         - id
@@ -381,5 +381,5 @@ components:
           example: ja
         type:
           type: integer
-          description: 旧 v1 の音声タイプ番号
+          description: v1 の音声タイプ番号
           example: 0

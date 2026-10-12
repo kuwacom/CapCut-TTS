@@ -241,9 +241,9 @@ HAR では `extra` または `biz_extra` 内の `tonetype` に voice_type が埋
 - `src/services/CapCutService.ts`
   音声カタログ取得(panel 第一経路とカテゴリ別フォールバック)と TTS 実行の orchestration
 
-## 10. 旧フローとの違い
+## 10. v1 との違い
 
-旧プロジェクトでは `type=番号` → `speaker` への固定マッピングが中心だった
+v1 では `type=番号` → `speaker` への固定マッピングが中心だった
 
 現行の CapCut Web では
 
@@ -257,6 +257,6 @@ HAR では `extra` または `biz_extra` 内の `tonetype` に voice_type が埋
 そのため現行実装では
 
 - 動的にカテゴリ横断で voice 一覧を取得する
-- ただし旧番号互換は残す
+- ただし v1 の番号互換は残す
 
 という方針を取っています

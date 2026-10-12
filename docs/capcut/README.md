@@ -4,7 +4,7 @@
 
 このディレクトリは、2026-03-30 に取得した通信ログと検証をもとに、CapCut Web の実装スタック、認証、セッション維持、TTS 実行、音声モデル取得の仕組みを整理したものです
 
-この調査は、CapCut-TTS 側の実装を旧 `token + websocket` フローから、現行の `email/password + session cookie` ベースのフローへ寄せるために行いました
+この調査は、CapCut-TTS 側の実装を `token + websocket` ベースの v1 と、`email/password + session cookie` ベースの v2 の 2 系統で扱えるようにするために行いました
 
 ## 参照した一次資料
 
@@ -21,7 +21,7 @@
 - ログイン後の本体 API は `edit-api-sg.capcut.com` に集約される
 - TTS 実行は少なくとも 2 系統あり、現在は `storyboard/v1/tts/multi_platform` がもっとも素直
 - editor 上の別系統として `lv/v2/intelligence/create` → `lv/v2/intelligence/query` も使われている
-- 旧実装の `common/tts/token + sami websocket` は、今回では主経路として使われていない
+- v1 の `common/tts/token + sami websocket` はアカウントなしで利用できる経路として残っている
 - bundle 由来の設定値は HAR または live アクセスから抽出し、`capcut-bundle-config.json` に保存して再利用できる
 
 ## 実装スタックの見取り図
@@ -67,6 +67,22 @@
   CapCut Web の認証、verifyFp、Cookie、session 維持、sign まわり
 - [tts-and-voice-models.md](./tts-and-voice-models.md)
   TTS 実行フロー、音声カテゴリ、モデル取得、`type` 互換の考え方
+
+## API バージョン
+
+### v1
+
+- `token + WebSocket` 経路
+- CapCut アカウントなしで利用できる
+- endpoint は `/v1/models` と `/v1/synthesize`
+- token は `/lv/v1/common/tts/token` から取得し、署名はリクエスト時に自動生成する
+
+### v2
+
+- `email/password + session cookie` 経路
+- CapCut アカウントが必要
+- endpoint は `/v2/speakers` と `/v2/synthesize`
+- 音声カタログは CapCut Web の panel API から動的に取得する
 
 ## 調査時点の重要な結論
 

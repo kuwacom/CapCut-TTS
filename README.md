@@ -2,9 +2,10 @@
 
 [English README](./README.en.md)
 
-CapCut Web に email / password でログインし、session を維持しながら最新の Web TTS 経路で音声を取得する、セルフホスト用ラッパー API です。
+CapCut の TTS を 2 系統の API で扱えるセルフホスト用ラッパー API です。
 
-旧来の `token + websocket` 方式ではなく、現在の CapCut Web の認証フローと `storyboard/v1/tts/multi_platform` に合わせています。
+- **v1**: token + WebSocket 経路。CapCut アカウントなしで利用できます
+- **v2**: CapCut Web editor の session 経路。email / password ログインが必要です
 
 ## できること
 
@@ -13,7 +14,7 @@ CapCut Web に email / password でログインし、session を維持しなが�
 - `GET /v2/speakers/:speakerId/preview` で話者プレビュー音声を取得
 - `GET /v2/synthesize` で MP3 音声を取得
 - `POST /v2/synthesize` で JSON body を使って MP3 音声を取得
-- `GET /v1/synthesize` で旧 token + websocket フローの WAV 音声を取得
+- `GET /v1/synthesize` で token + WebSocket 経路の WAV 音声を取得
 - `buffer` と `stream` の 2 つのレスポンス方式に対応
 - session を `capcut-session.json` に保存して再利用
 - CapCut の bundle から抽出した設定を `capcut-bundle-config.json` に保存して再利用
@@ -24,7 +25,7 @@ CapCut Web に email / password でログインし、session を維持しなが�
 - CapCut 側の仕様変更により、突然動かなくなる可能性があります
 - 利用にあたっては、各自の責任で公開範囲や運用方法を判断してください
 
-## クイックスタート
+## クイックスタート（共通）
 
 ### 1. 依存関係をインストール
 
@@ -38,9 +39,9 @@ npm install
 cp .env.example .env
 ```
 
-### 3. CapCut の認証情報を設定
+### 3. `.env` を用意
 
-最低限、次の 2 つを設定してください。
+v2 を使う場合は、次の 2 つを設定してください。
 
 ```env
 CAPCUT_EMAIL=your-account@example.com
@@ -48,14 +49,30 @@ CAPCUT_PASSWORD=your-password
 ```
 
 通常は他の値はデフォルトのままで動きます。
-
+  
 ### 4. 開発サーバーを起動
 
 ```bash
 npm run dev
 ```
 
-### 5. API を呼び出す
+## v1 クイックスタート
+
+v1 は token + WebSocket 経路で、CapCut アカウントなしで利用できます。
+署名はリクエスト時に自動生成します。
+
+```bash
+# 利用できる音声モデル一覧
+curl "http://localhost:8080/v1/models"
+
+# 音声合成
+curl "http://localhost:8080/v1/synthesize?text=こんにちは&type=0&pitch=10&speed=10&volume=10&method=buffer" --output voice.wav
+```
+
+## v2 クイックスタート
+
+v2 は CapCut Web editor の session 経路です。  
+`.env` に CapCut アカウント情報を設定してください。
 
 ```bash
 # 話者一覧を取得
@@ -72,13 +89,6 @@ curl -X POST "http://localhost:8080/v2/synthesize" \
   -H "Content-Type: application/json" \
   -d '{"text":"こんにちは","speaker":"labebe","method":"buffer"}' \
   --output voice.mp3
-```
-
-旧フローは `LEGACY_DEVICE_TIME` と `LEGACY_SIGN` 未設定でも動作します。
-設定した場合は、その静的な署名ヘッダーを優先します。
-
-```bash
-curl "http://localhost:8080/v1/synthesize?text=こんにちは&type=0&pitch=10&speed=10&volume=10&method=buffer" --output voice.wav
 ```
 
 ## bundle 設定の扱い
@@ -133,8 +143,8 @@ http://<host>:<port>/
 | GET | `/v2/speakers/:speakerId/preview` | 話者プレビュー音声を取得 |
 | GET | `/v2/synthesize` | 音声合成（クエリパラメーター） |
 | POST | `/v2/synthesize` | 音声合成（JSON body） |
-| GET | `/v1/models` | 旧音声モデル一覧 |
-| GET | `/v1/synthesize` | 旧フロー音声合成 |
+| GET | `/v1/models` | v1 音声モデル一覧 |
+| GET | `/v1/synthesize` | v1 音声合成 |
 
 ### `GET /v2/speakers` レスポンス
 
@@ -167,7 +177,7 @@ http://<host>:<port>/
 | `text` | string | はい | 読み上げるテキスト | なし |
 | `speaker` | string | いいえ | 話者指定。alias / `effectId` / `resourceId` / speaker name を受け付けます。`type` より優先されます | なし |
 | `type` | number \| string | いいえ | フォールバック用の voice index。`speaker` 未指定時に使用されます | `0` |
-| `pitch` | number | いいえ | 旧互換パラメーター。現在の Web TTS では未使用です | `10` |
+| `pitch` | number | いいえ | v1 互換パラメーター。現在の Web TTS では未使用です | `10` |
 | `speed` | number | いいえ | 再生速度。`10` が等速です | `10` |
 | `volume` | number | いいえ | 音量。`10` が標準です | `10` |
 | `method` | string | いいえ | `buffer` または `stream` | `buffer` |
@@ -194,8 +204,8 @@ GET と同じフィールドを JSON body で送信します。
 | `400 Bad Request` | パラメーターが不正 |
 | `502 Bad Gateway` | CapCut 側の認証または音声生成に失敗 |
 
-`/v1/synthesize` は旧 token + websocket フローを使い、`audio/wav` を返します。  
-`LEGACY_DEVICE_TIME` と `LEGACY_SIGN` が未設定の場合は、API 署名を動的に再生成します。
+`/v1/synthesize` は token + WebSocket フローを使い、`audio/wav` を返します。  
+署名はリクエスト時に自動生成します。
 
 ### 話者解決ルール
 
@@ -255,11 +265,11 @@ GET と同じフィールドを JSON body で送信します。
 | `CAPCUT_SPEAKER_PREVIEW_MAX_AGE_DAYS` | プレビュー再生成までの日数 |
 | `CAPCUT_TTS_TEXT_CHUNK_MAX_LENGTH` | 長文 TTS を分割する最大文字数 |
 | `CAPCUT_TTS_TEXT_CHUNK_BOUNDARY_SEARCH_RATIO` | 区切り文字を探し始める位置の割合 |
-| `LEGACY_CAPCUT_API_URL` | 旧 token API のベース URL |
-| `LEGACY_BYTEINTL_API_URL` | 旧 WebSocket 接続先のベース URL |
-| `LEGACY_DEVICE_TIME` | 旧 token API に送る Device-Time。未設定時は動的署名 |
-| `LEGACY_SIGN` | 旧 token API に送る Sign。未設定時は動的署名 |
-| `LEGACY_TOKEN_INTERVAL` | legacy token の再取得間隔。単位は時間 |
+| `LEGACY_CAPCUT_API_URL` | v1 token API のベース URL |
+| `LEGACY_BYTEINTL_API_URL` | v1 WebSocket 接続先のベース URL |
+| `LEGACY_DEVICE_TIME` | v1 token API に送る Device-Time。未設定時は動的署名 |
+| `LEGACY_SIGN` | v1 token API に送る Sign。未設定時は動的署名 |
+| `LEGACY_TOKEN_INTERVAL` | v1 token の再取得間隔。単位は時間 |
 | `USER_AGENT` | CapCut へ送る User-Agent |
 | `SESSION_REFRESH_INTERVAL_MINUTES` | background session validation 間隔 |
 | `HOST` | サーバー待ち受け host |
@@ -281,6 +291,6 @@ GET と同じフィールドを JSON body で送信します。
 
 - 起動時に session の warmup を試み、その後は `SESSION_REFRESH_INTERVAL_MINUTES` ごとに検証します
 - 起動時や実行時に bundle 情報が必要になると、`capcut-bundle-config.json` を読み込み、必要に応じて live 抽出して更新します
-- 起動時に legacy token の取得も試みます
+- 起動時に v1 token の取得も試みます
 - `speaker` に `effectId` / `resourceId` / speaker name を直接渡しても選択できます
 - 現在の CapCut Web TTS は MP3 を返し、レスポンスの `Content-Disposition` は `inline` です

@@ -2,9 +2,10 @@
 
 [日本語 README](./README.md)
 
-A self-hosted wrapper API for logging in to CapCut Web with email / password, keeping the session alive, and fetching audio through the latest Web TTS flow.
+A self-hosted wrapper API that exposes two CapCut TTS routes.
 
-Instead of the old `token + websocket` approach, this project follows the current CapCut Web authentication flow and `storyboard/v1/tts/multi_platform`.
+- **v1**: token + WebSocket route. It does not require a CapCut account.
+- **v2**: CapCut Web editor session route. It requires email / password login.
 
 ## Features
 
@@ -13,7 +14,7 @@ Instead of the old `token + websocket` approach, this project follows the curren
 - Fetch speaker preview audio via `GET /v2/speakers/:speakerId/preview`
 - Fetch MP3 audio via `GET /v2/synthesize`
 - Fetch MP3 audio via `POST /v2/synthesize` with a JSON body
-- Fetch WAV audio through the old token + websocket flow via `GET /v1/synthesize`
+- Fetch WAV audio through the token + WebSocket route via `GET /v1/synthesize`
 - Support both `buffer` and `stream` response modes
 - Save and reuse the session in `capcut-session.json`
 - Save and reuse bundle-derived runtime settings in `capcut-bundle-config.json`
@@ -24,7 +25,7 @@ Instead of the old `token + websocket` approach, this project follows the curren
 - It may stop working at any time if CapCut changes its internal implementation
 - Please decide how to publish and operate it at your own risk
 
-## Quick Start
+## Quick Start (Common)
 
 ### 1. Install dependencies
 
@@ -38,9 +39,9 @@ npm install
 cp .env.example .env
 ```
 
-### 3. Set CapCut credentials
+### 3. Prepare `.env`
 
-At minimum, configure the following two values:
+For v2, configure the following two values:
 
 ```env
 CAPCUT_EMAIL=your-account@example.com
@@ -55,7 +56,23 @@ The default values are usually enough for everything else.
 npm run dev
 ```
 
-### 5. Call the API
+## v1 Quick Start
+
+v1 uses the token + WebSocket route and does not require a CapCut account.
+The request signature is generated automatically.
+
+```bash
+# List available voice models
+curl "http://localhost:8080/v1/models"
+
+# Synthesize audio
+curl "http://localhost:8080/v1/synthesize?text=Hello&type=0&pitch=10&speed=10&volume=10&method=buffer" --output voice.wav
+```
+
+## v2 Quick Start
+
+v2 uses the CapCut Web editor session route.
+Set your CapCut account information in `.env`.
 
 ```bash
 # List available speakers
@@ -72,12 +89,6 @@ curl -X POST "http://localhost:8080/v2/synthesize" \
   -H "Content-Type: application/json" \
   -d '{"text":"Hello","speaker":"labebe","method":"buffer"}' \
   --output voice.mp3
-```
-
-You can call the old flow directly. `LEGACY_DEVICE_TIME` and `LEGACY_SIGN` are optional; when not set, an automatically generated signature is used.
-
-```bash
-curl "http://localhost:8080/v1/synthesize?text=Hello&type=0&pitch=10&speed=10&volume=10&method=buffer" --output voice.wav
 ```
 
 ## How Bundle Config Works
@@ -132,8 +143,8 @@ http://<host>:<port>/
 | GET | `/v2/speakers/:speakerId/preview` | Get speaker preview audio |
 | GET | `/v2/synthesize` | Synthesize audio using query parameters |
 | POST | `/v2/synthesize` | Synthesize audio using a JSON body |
-| GET | `/v1/models` | List legacy voice models |
-| GET | `/v1/synthesize` | Legacy flow synthesis |
+| GET | `/v1/models` | List v1 voice models |
+| GET | `/v1/synthesize` | v1 synthesis |
 
 ### `GET /v2/speakers` Response
 
@@ -166,7 +177,7 @@ Returns preview audio for the specified speaker. On first access, the server gen
 | `text` | string | Yes | Text to read aloud | None |
 | `speaker` | string | No | Speaker selector. Accepts alias / `effectId` / `resourceId` / speaker name. Takes priority over `type` | None |
 | `type` | number \| string | No | Fallback voice index. Used when `speaker` is not specified | `0` |
-| `pitch` | number | No | Legacy compatibility parameter. Currently unused by the Web TTS flow | `10` |
+| `pitch` | number | No | Compatibility parameter. Currently unused by the Web TTS flow | `10` |
 | `speed` | number | No | Playback speed. `10` means normal speed | `10` |
 | `volume` | number | No | Volume. `10` means standard level | `10` |
 | `method` | string | No | `buffer` or `stream` | `buffer` |
@@ -193,8 +204,8 @@ Send the same fields as the GET query parameters in JSON.
 | `400 Bad Request` | Invalid parameters |
 | `502 Bad Gateway` | Authentication or synthesis failed on the CapCut side |
 
-`/v1/synthesize` uses the old token + websocket flow and returns `audio/wav`.  
-`LEGACY_DEVICE_TIME` and `LEGACY_SIGN` are optional; when not set, an automatically generated signature is used.
+`/v1/synthesize` uses the token + WebSocket flow and returns `audio/wav`.  
+The request signature is generated automatically.
 
 ### Speaker Resolution Rules
 
@@ -254,11 +265,11 @@ Main environment variables are listed below.
 | `CAPCUT_SPEAKER_PREVIEW_MAX_AGE_DAYS` | Preview regeneration threshold in days |
 | `CAPCUT_TTS_TEXT_CHUNK_MAX_LENGTH` | Maximum text length for each long-form TTS chunk |
 | `CAPCUT_TTS_TEXT_CHUNK_BOUNDARY_SEARCH_RATIO` | Ratio where boundary search starts inside each TTS chunk |
-| `LEGACY_CAPCUT_API_URL` | Base URL for the old token API |
-| `LEGACY_BYTEINTL_API_URL` | Base URL for the old websocket endpoint |
-| `LEGACY_DEVICE_TIME` | Device-Time sent to the old token API. Auto-generated when omitted |
-| `LEGACY_SIGN` | Sign sent to the old token API. Auto-generated when omitted |
-| `LEGACY_TOKEN_INTERVAL` | Legacy token refresh interval in hours |
+| `LEGACY_CAPCUT_API_URL` | Base URL for the v1 token API |
+| `LEGACY_BYTEINTL_API_URL` | Base URL for the v1 WebSocket endpoint |
+| `LEGACY_DEVICE_TIME` | Device-Time sent to the v1 token API. Auto-generated when omitted |
+| `LEGACY_SIGN` | Sign sent to the v1 token API. Auto-generated when omitted |
+| `LEGACY_TOKEN_INTERVAL` | v1 token refresh interval in hours |
 | `USER_AGENT` | User-Agent sent to CapCut |
 | `SESSION_REFRESH_INTERVAL_MINUTES` | Background session validation interval |
 | `HOST` | Server bind host |
@@ -280,6 +291,6 @@ Main environment variables are listed below.
 
 - The server attempts a session warmup on startup and validates it every `SESSION_REFRESH_INTERVAL_MINUTES`
 - When bundle settings are needed, the server loads `capcut-bundle-config.json` first and refreshes it through live extraction only when necessary
-- `LEGACY_DEVICE_TIME` and `LEGACY_SIGN` are optional, and the server also warms up the legacy token flow on startup
+- The server also warms up the v1 token flow on startup
 - You can also pass `effectId`, `resourceId`, or speaker name directly to `speaker`
 - The current CapCut Web TTS returns MP3, and the response `Content-Disposition` is `inline`
