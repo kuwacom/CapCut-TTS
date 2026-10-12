@@ -1,5 +1,6 @@
 import { Readable } from 'node:stream';
 import { WebSocket, type RawData } from 'ws';
+import { createEditApiSignature } from '@/api/capcut-edit/apiClient';
 import env from '@/configs/env';
 import { legacySpeakers } from '@/models/capcutLegacySpeakers';
 import logger from '@/services/logger';
@@ -34,10 +35,11 @@ class LegacyCapCutService {
   private refreshTimer: NodeJS.Timeout | null = null;
 
   /**
-   * 旧 token + websocket フローに必要な環境変数が揃っているか
+   * 旧 token + websocket フローが利用可能か
+   * 静的 SIGN があればそれを使い、無ければ都度生成する
    */
   isConfigured() {
-    return Boolean(env.LEGACY_DEVICE_TIME && env.LEGACY_SIGN);
+    return true;
   }
 
   /**
@@ -167,15 +169,30 @@ class LegacyCapCutService {
       `${env.LEGACY_CAPCUT_API_URL}/common/tts/token`,
       {
         method: 'POST',
-        headers: new Headers({
-          Appvr: LEGACY_CAPCUT_APP_VERSION,
-          'Device-Time': env.LEGACY_DEVICE_TIME ?? '',
-          Origin: env.CAPCUT_WEB_URL,
-          Pf: LEGACY_PLATFORM,
-          Sign: env.LEGACY_SIGN ?? '',
-          'Sign-Ver': LEGACY_SIGN_VERSION,
-          'User-Agent': env.USER_AGENT,
-        }),
+        headers: (() => {
+          const url = new URL('/common/tts/token', env.LEGACY_CAPCUT_API_URL);
+          const hasStaticSign = Boolean(
+            env.LEGACY_DEVICE_TIME && env.LEGACY_SIGN
+          );
+          const { sign, deviceTime } = createEditApiSignature(
+            url.toString(),
+            LEGACY_PLATFORM,
+            LEGACY_CAPCUT_APP_VERSION,
+            ''
+          );
+
+          return new Headers({
+            Appvr: LEGACY_CAPCUT_APP_VERSION,
+            'Device-Time': hasStaticSign
+              ? env.LEGACY_DEVICE_TIME ?? ''
+              : deviceTime,
+            Origin: env.CAPCUT_WEB_URL,
+            Pf: LEGACY_PLATFORM,
+            Sign: hasStaticSign ? env.LEGACY_SIGN ?? '' : sign,
+            'Sign-Ver': LEGACY_SIGN_VERSION,
+            'User-Agent': env.USER_AGENT,
+          });
+        })(),
         signal: AbortSignal.timeout(LEGACY_TOKEN_REQUEST_TIMEOUT_MS),
       }
     );
