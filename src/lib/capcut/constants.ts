@@ -6,7 +6,8 @@ export const capCutConstants = {
   appId: '348188',
   loginSdkVersion: '2.1.10-tiktok',
   webAppVersion: '5.8.0',
-  editorAppVersion: '8.4.0',
+  // 2026-10 の editor bundle が署名付きリクエストで送っている appvr に合わせている
+  editorAppVersion: '5.8.0',
   platformId: '7',
   signVersion: '1',
   voicePanel: 'tone',

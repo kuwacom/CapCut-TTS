@@ -18,9 +18,11 @@ export interface SynthesizeOptions {
 export interface Speaker {
   title: string;
   description: string;
-  speaker: string;
+  speaker?: string;
   effectId: string;
   resourceId: string;
+  ttsPlatform?: number;
+  isVip?: boolean;
   style?: string;
   language?: string;
 }
@@ -30,12 +32,14 @@ export interface Speaker {
  */
 export interface SpeakerInfo {
   id: string;
+  speaker?: string;
   resourceId: string;
   effectId: string;
   name: string;
   description: string;
   style: string;
   language: string;
+  isVip: boolean;
 }
 
 /**

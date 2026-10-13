@@ -2,9 +2,10 @@
 
 [English README](./README.en.md)
 
-CapCut Web に email / password でログインし、session を維持しながら最新の Web TTS 経路で音声を取得する、セルフホスト用ラッパー API です。
+CapCut の TTS を 2 系統の API で扱えるセルフホスト用ラッパー API です。
 
-旧来の `token + websocket` 方式ではなく、現在の CapCut Web の認証フローと `storyboard/v1/tts/multi_platform` に合わせています。
+- **v1**: token + WebSocket 経路。CapCut アカウントなしで利用できます
+- **v2**: CapCut Web editor の session 経路。email / password ログインが必要です
 
 ## できること
 
@@ -13,7 +14,7 @@ CapCut Web に email / password でログインし、session を維持しなが�
 - `GET /v2/speakers/:speakerId/preview` で話者プレビュー音声を取得
 - `GET /v2/synthesize` で MP3 音声を取得
 - `POST /v2/synthesize` で JSON body を使って MP3 音声を取得
-- `GET /v1/synthesize` で旧 token + websocket フローの WAV 音声を取得
+- `GET /v1/synthesize` で token + WebSocket 経路の WAV 音声を取得
 - `buffer` と `stream` の 2 つのレスポンス方式に対応
 - session を `capcut-session.json` に保存して再利用
 - CapCut の bundle から抽出した設定を `capcut-bundle-config.json` に保存して再利用
@@ -24,23 +25,15 @@ CapCut Web に email / password でログインし、session を維持しなが�
 - CapCut 側の仕様変更により、突然動かなくなる可能性があります
 - 利用にあたっては、各自の責任で公開範囲や運用方法を判断してください
 
-## クイックスタート
+## クイックスタート（Docker Compose）
 
-### 1. 依存関係をインストール
-
-```bash
-npm install
-```
-
-### 2. `.env` を作成
+### 1. `.env` を作成
 
 ```bash
 cp .env.example .env
 ```
 
-### 3. CapCut の認証情報を設定
-
-最低限、次の 2 つを設定してください。
+v2 を使う場合は、次の 2 つを設定してください。
 
 ```env
 CAPCUT_EMAIL=your-account@example.com
@@ -49,13 +42,56 @@ CAPCUT_PASSWORD=your-password
 
 通常は他の値はデフォルトのままで動きます。
 
-### 4. 開発サーバーを起動
+### 2. 起動
+
+```bash
+docker compose up -d
+```
+
+GHCR の公開イメージ（`ghcr.io/kuwacom/capcut-tts:latest`）を取得して `http://localhost:8080` で起動します。
+session や bundle 設定などの書き込み状態は `data/` へ保存されます。
+
+ソースからローカルビルドしたい場合は `docker compose build` を使います。
+
+イメージのタグは次の通りです。
+
+| タグ | 更新タイミング |
+| --- | --- |
+| `latest` | main への merge ごと |
+| `2.3.0` などのバージョン番号 | main への merge ごと |
+| `nightly` | develop の push ごと |
+
+## 開発（ソースから実行）
+
+### 1. 依存関係をインストール
+
+```bash
+npm install
+```
+
+### 2. 開発サーバーを起動
 
 ```bash
 npm run dev
 ```
 
-### 5. API を呼び出す
+## v1 クイックスタート
+
+v1 は token + WebSocket 経路で、CapCut アカウントなしで利用できます。
+署名はリクエスト時に自動生成します。
+
+```bash
+# 利用できる音声モデル一覧
+curl "http://localhost:8080/v1/models"
+
+# 音声合成
+curl "http://localhost:8080/v1/synthesize?text=こんにちは&type=0&pitch=10&speed=10&volume=10&method=buffer" --output voice.wav
+```
+
+## v2 クイックスタート
+
+v2 は CapCut Web editor の session 経路です。  
+`.env` に CapCut アカウント情報を設定してください。
 
 ```bash
 # 話者一覧を取得
@@ -72,12 +108,6 @@ curl -X POST "http://localhost:8080/v2/synthesize" \
   -H "Content-Type: application/json" \
   -d '{"text":"こんにちは","speaker":"labebe","method":"buffer"}' \
   --output voice.mp3
-```
-
-旧フローを使う場合は、`LEGACY_DEVICE_TIME` と `LEGACY_SIGN` を設定したうえで次のように呼び出せます。
-
-```bash
-curl "http://localhost:8080/v1/synthesize?text=こんにちは&type=0&pitch=10&speed=10&volume=10&method=buffer" --output voice.wav
 ```
 
 ## bundle 設定の扱い
@@ -126,14 +156,14 @@ http://<host>:<port>/
 
 ### エンドポイント
 
-| メソッド | パス | 説明 |
-| --- | --- | --- |
-| GET | `/v2/speakers` | 利用可能な話者一覧を取得 |
-| GET | `/v2/speakers/:speakerId/preview` | 話者プレビュー音声を取得 |
-| GET | `/v2/synthesize` | 音声合成（クエリパラメーター） |
-| POST | `/v2/synthesize` | 音声合成（JSON body） |
-| GET | `/v1/models` | 旧音声モデル一覧 |
-| GET | `/v1/synthesize` | 旧フロー音声合成 |
+| メソッド | パス                              | 説明                           |
+| -------- | --------------------------------- | ------------------------------ |
+| GET      | `/v2/speakers`                    | 利用可能な話者一覧を取得       |
+| GET      | `/v2/speakers/:speakerId/preview` | 話者プレビュー音声を取得       |
+| GET      | `/v2/synthesize`                  | 音声合成（クエリパラメーター） |
+| POST     | `/v2/synthesize`                  | 音声合成（JSON body）          |
+| GET      | `/v1/models`                      | v1 音声モデル一覧              |
+| GET      | `/v1/synthesize`                  | v1 音声合成                    |
 
 ### `GET /v2/speakers` レスポンス
 
@@ -141,15 +171,19 @@ http://<host>:<port>/
 [
   {
     "id": "ICL_en_female_jiaoao",
+    "speaker": "ICL_en_female_jiaoao",
     "resourceId": "7530105822785899777",
     "effectId": "7530105822785899777",
     "name": "ラベベさん",
     "description": "英語の明るい女性ボイス",
     "style": "",
-    "language": "en"
+    "language": "en",
+    "isVip": true
   }
 ]
 ```
+
+`isVip` は CapCut 側の VIP フラグです。`CAPCUT_EXCLUDE_VIP_VOICES=true` にすると、VIP のうち 11labs 連携の音声だけを一覧から除外します。`isVip` は無料で使える声にも付いているため、除外対象にはなりません。
 
 ### `GET /v2/speakers/:speakerId/preview`
 
@@ -157,15 +191,15 @@ http://<host>:<port>/
 
 ### `GET /v2/synthesize` クエリパラメーター
 
-| パラメーター | 型 | 必須 | 説明 | デフォルト |
-| --- | --- | --- | --- | --- |
-| `text` | string | はい | 読み上げるテキスト | なし |
-| `speaker` | string | いいえ | 話者指定。alias / `effectId` / `resourceId` / speaker name を受け付けます。`type` より優先されます | なし |
-| `type` | number \| string | いいえ | フォールバック用の voice index。`speaker` 未指定時に使用されます | `0` |
-| `pitch` | number | いいえ | 旧互換パラメーター。現在の Web TTS では未使用です | `10` |
-| `speed` | number | いいえ | 再生速度。`10` が等速です | `10` |
-| `volume` | number | いいえ | 音量。`10` が標準です | `10` |
-| `method` | string | いいえ | `buffer` または `stream` | `buffer` |
+| パラメーター | 型               | 必須   | 説明                                                                                               | デフォルト |
+| ------------ | ---------------- | ------ | -------------------------------------------------------------------------------------------------- | ---------- |
+| `text`       | string           | はい   | 読み上げるテキスト                                                                                 | なし       |
+| `speaker`    | string           | いいえ | 話者指定。alias / `effectId` / `resourceId` / speaker name を受け付けます。`type` より優先されます | なし       |
+| `type`       | number \| string | いいえ | フォールバック用の voice index。`speaker` 未指定時に使用されます                                   | `0`        |
+| `pitch`      | number           | いいえ | v1 互換パラメーター。現在の Web TTS では未使用です                                                 | `10`       |
+| `speed`      | number           | いいえ | 再生速度。`10` が等速です                                                                          | `10`       |
+| `volume`     | number           | いいえ | 音量。`10` が標準です                                                                              | `10`       |
+| `method`     | string           | いいえ | `buffer` または `stream`                                                                           | `buffer`   |
 
 ### `POST /v2/synthesize` リクエストボディ
 
@@ -183,22 +217,22 @@ GET と同じフィールドを JSON body で送信します。
 
 ### レスポンス
 
-| ステータスコード | 内容 |
-| --- | --- |
-| `200 OK` | `audio/mpeg` |
-| `400 Bad Request` | パラメーターが不正 |
+| ステータスコード  | 内容                                |
+| ----------------- | ----------------------------------- |
+| `200 OK`          | `audio/mpeg`                        |
+| `400 Bad Request` | パラメーターが不正                  |
 | `502 Bad Gateway` | CapCut 側の認証または音声生成に失敗 |
 
-`/v1/synthesize` は旧 token + websocket フローを使い、`audio/wav` を返します。  
-`LEGACY_DEVICE_TIME` と `LEGACY_SIGN` が未設定の場合は `503 Service Unavailable` を返します。
+`/v1/synthesize` は token + WebSocket フローを使い、`audio/wav` を返します。  
+署名はリクエスト時に自動生成します。
 
 ### 話者解決ルール
 
-| 条件 | 挙動 |
-| --- | --- |
+| 条件               | 挙動                                    |
+| ------------------ | --------------------------------------- |
 | `speaker` 指定あり | `speaker` で話者を解決（`type` は無視） |
-| `type` のみ指定 | `type` でフォールバック話者を選択 |
-| 両方なし | デフォルト話者（index 0）を使用 |
+| `type` のみ指定    | `type` でフォールバック話者を選択       |
+| 両方なし           | デフォルト話者（index 0）を使用         |
 
 ## `type` / `speaker` 互換表
 
@@ -206,77 +240,74 @@ GET と同じフィールドを JSON body で送信します。
 
 これら以外の話者は、`/v2/speakers` を参照してください。
 
-| type | alias | 話者名 |
-| --- | --- | --- |
-| `0` | `labebe` | ラベベさん |
-| `1` | `cool_lady` | 冷静なレディ |
-| `2` | `happy_dino` | ハッピーディノ |
-| `3` | `puppet` | おかしなあやつり人形 |
-| `4` | `popular_guy` | モテ男 |
-| `5` | `bratty_witch` | 生意気な魔女 |
-| `6` | `game_host` | ゲームホスト |
-| `7` | `calm_dubbing` | 穏やかな吹き替え |
-| `8` | `gruff_uncle` | 濁声おじさん |
-| `9` | `witch_granny` | 魔婆 |
-| `10` | `high_tension` | 高テンション |
-| `11` | `serious_man` | 真面目男 |
-| `12` | `manager` | マネージャー |
-| `13` | `little_sister` | 妹系 |
-| `14` | `young_girl` | 幼い女の子 |
-| `15` | `peaceful_woman` | 平和な女性 |
+| type | alias            | 話者名               |
+| ---- | ---------------- | -------------------- |
+| `0`  | `labebe`         | ラベベさん           |
+| `1`  | `cool_lady`      | 冷静なレディ         |
+| `2`  | `happy_dino`     | ハッピーディノ       |
+| `3`  | `puppet`         | おかしなあやつり人形 |
+| `4`  | `popular_guy`    | モテ男               |
+| `5`  | `bratty_witch`   | 生意気な魔女         |
+| `6`  | `game_host`      | ゲームホスト         |
+| `7`  | `calm_dubbing`   | 穏やかな吹き替え     |
+| `8`  | `gruff_uncle`    | 濁声おじさん         |
+| `9`  | `witch_granny`   | 魔婆                 |
+| `10` | `high_tension`   | 高テンション         |
+| `11` | `serious_man`    | 真面目男             |
+| `12` | `manager`        | マネージャー         |
+| `13` | `little_sister`  | 妹系                 |
+| `14` | `young_girl`     | 幼い女の子           |
+| `15` | `peaceful_woman` | 平和な女性           |
 
 ## 環境変数
 
 主要な環境変数は次のとおりです。
 
-| 変数名 | 説明 |
-| --- | --- |
-| `CAPCUT_WEB_URL` | CapCut Web のベース URL |
-| `CAPCUT_EDIT_API_URL` | CapCut Edit API のベース URL |
-| `CAPCUT_LOGIN_HOST` | primary login host |
-| `CAPCUT_FALLBACK_LOGIN_HOST` | fallback login host |
-| `CAPCUT_EMAIL` | CapCut ログイン用 email |
-| `CAPCUT_PASSWORD` | CapCut ログイン用 password |
-| `CAPCUT_LOCALE` | API に送る locale |
-| `CAPCUT_PAGE_LOCALE` | login page URL の locale |
-| `CAPCUT_REGION` | CapCut request に使う region |
-| `CAPCUT_STORE_COUNTRY_CODE` | store-country-code header の値 |
-| `CAPCUT_DEVICE_ID` | device id を固定したい場合に指定 |
-| `CAPCUT_VERIFY_FP` | verifyFp を固定したい場合に指定 |
-| `CAPCUT_BUNDLE_CONFIG_PATH` | bundle 設定キャッシュの保存先 |
-| `CAPCUT_VOICE_CATEGORY_ID` | voice catalog 取得に使う category id |
-| `CAPCUT_SESSION_STORE_PATH` | session 保存先 |
-| `CAPCUT_SPEAKER_PREVIEW_TEMP_DIR` | 話者プレビュー音声キャッシュの保存先 |
-| `CAPCUT_SPEAKER_PREVIEW_TEXT` | プレビュー生成時に読み上げるテキスト |
-| `CAPCUT_SPEAKER_PREVIEW_MAX_AGE_DAYS` | プレビュー再生成までの日数 |
-| `CAPCUT_TTS_TEXT_CHUNK_MAX_LENGTH` | 長文 TTS を分割する最大文字数 |
-| `CAPCUT_TTS_TEXT_CHUNK_BOUNDARY_SEARCH_RATIO` | 区切り文字を探し始める位置の割合 |
-| `LEGACY_CAPCUT_API_URL` | 旧 token API のベース URL |
-| `LEGACY_BYTEINTL_API_URL` | 旧 WebSocket 接続先のベース URL |
-| `LEGACY_DEVICE_TIME` | 旧 token API に送る Device-Time |
-| `LEGACY_SIGN` | 旧 token API に送る Sign |
-| `LEGACY_TOKEN_INTERVAL` | legacy token の再取得間隔。単位は時間 |
-| `USER_AGENT` | CapCut へ送る User-Agent |
-| `SESSION_REFRESH_INTERVAL_MINUTES` | background session validation 間隔 |
-| `HOST` | サーバー待ち受け host |
-| `PORT` | サーバー待ち受け port |
-| `CORS_POLICY_ORIGIN` | CORS 許可 Origin |
+| 変数名                                        | 説明                                 |
+| --------------------------------------------- | ------------------------------------ |
+| `CAPCUT_WEB_URL`                              | CapCut Web のベース URL              |
+| `CAPCUT_EDIT_API_URL`                         | CapCut Edit API のベース URL         |
+| `CAPCUT_LOGIN_HOST`                           | primary login host                   |
+| `CAPCUT_FALLBACK_LOGIN_HOST`                  | fallback login host                  |
+| `CAPCUT_EMAIL`                                | CapCut ログイン用 email              |
+| `CAPCUT_PASSWORD`                             | CapCut ログイン用 password           |
+| `CAPCUT_LOCALE`                               | API に送る locale                    |
+| `CAPCUT_PAGE_LOCALE`                          | login page URL の locale             |
+| `CAPCUT_REGION`                               | CapCut request に使う region         |
+| `CAPCUT_STORE_COUNTRY_CODE`                   | store-country-code header の値       |
+| `CAPCUT_DEVICE_ID`                            | device id を固定したい場合に指定     |
+| `CAPCUT_VERIFY_FP`                            | verifyFp を固定したい場合に指定      |
+| `CAPCUT_BUNDLE_CONFIG_PATH`                   | bundle 設定キャッシュの保存先        |
+| `CAPCUT_SESSION_STORE_PATH`                   | session 保存先                       |
+| `CAPCUT_SPEAKER_PREVIEW_TEMP_DIR`             | 話者プレビュー音声キャッシュの保存先 |
+| `CAPCUT_SPEAKER_PREVIEW_TEXT`                 | プレビュー生成時に読み上げるテキスト |
+| `CAPCUT_SPEAKER_PREVIEW_MAX_AGE_DAYS`         | プレビュー再生成までの日数           |
+| `CAPCUT_TTS_TEXT_CHUNK_MAX_LENGTH`            | 長文 TTS を分割する最大文字数        |
+| `CAPCUT_TTS_TEXT_CHUNK_BOUNDARY_SEARCH_RATIO` | 区切り文字を探し始める位置の割合     |
+| `LEGACY_CAPCUT_API_URL`                       | v1 token API のベース URL            |
+| `LEGACY_BYTEINTL_API_URL`                     | v1 WebSocket 接続先のベース URL      |
+| `LEGACY_TOKEN_INTERVAL`                       | v1 token の再取得間隔。単位は時間    |
+| `USER_AGENT`                                  | CapCut へ送る User-Agent             |
+| `SESSION_REFRESH_INTERVAL_MINUTES`            | background session validation 間隔   |
+| `HOST`                                        | サーバー待ち受け host                |
+| `PORT`                                        | サーバー待ち受け port                |
+| `CORS_POLICY_ORIGIN`                          | CORS 許可 Origin                     |
 
 ## npm scripts
 
-| コマンド | 内容 |
-| --- | --- |
-| `npm run dev` | 開発サーバー起動 |
-| `npm run typecheck` | TypeScript 型チェック |
-| `npm run lint` | ESLint |
-| `npm run build` | `dist/` へビルド |
-| `npm run start` | ビルド済みアプリ起動 |
+| コマンド                 | 内容                                        |
+| ------------------------ | ------------------------------------------- |
+| `npm run dev`            | 開発サーバー起動                            |
+| `npm run typecheck`      | TypeScript 型チェック                       |
+| `npm run lint`           | ESLint                                      |
+| `npm run build`          | `dist/` へビルド                            |
+| `npm run start`          | ビルド済みアプリ起動                        |
 | `npm run capcut:extract` | HAR から `capcut-bundle-config.json` を生成 |
 
 ## 補足
 
 - 起動時に session の warmup を試み、その後は `SESSION_REFRESH_INTERVAL_MINUTES` ごとに検証します
 - 起動時や実行時に bundle 情報が必要になると、`capcut-bundle-config.json` を読み込み、必要に応じて live 抽出して更新します
-- `LEGACY_DEVICE_TIME` と `LEGACY_SIGN` を設定すると、起動時に legacy token の取得も試みます
+- 起動時に v1 token の取得も試みます
 - `speaker` に `effectId` / `resourceId` / speaker name を直接渡しても選択できます
 - 現在の CapCut Web TTS は MP3 を返し、レスポンスの `Content-Disposition` は `inline` です

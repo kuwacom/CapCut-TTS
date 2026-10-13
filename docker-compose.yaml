@@ -1,12 +1,20 @@
 services:
   capcut-tts:
-    image: node:20
+    image: ghcr.io/kuwacom/capcut-tts:latest
     container_name: capcut-tts
-    working_dir: /app
-    volumes:
-      - ./:/app
-      - /app/node_modules
+    restart: always
     ports:
       - '8080:8080'
-    command: bash -c "npm install -g typescript tsc-alias && npm i && npm run build && npm run start"
-    restart: always
+    env_file:
+      - .env
+    environment:
+      PORT: 8080
+      # 状態は data/ へ集約して永続化する
+      CAPCUT_SESSION_STORE_PATH: data/capcut-session.json
+      CAPCUT_BUNDLE_CONFIG_PATH: data/capcut-bundle-config.json
+      CAPCUT_SPEAKER_PREVIEW_TEMP_DIR: data/speaker-preview-temp
+    volumes:
+      - ./data:/app/data
+    build:
+      context: .
+      dockerfile: docker/Dockerfile

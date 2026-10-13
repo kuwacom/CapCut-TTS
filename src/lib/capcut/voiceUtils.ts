@@ -17,6 +17,30 @@ const asString = (value: unknown): string | null => {
   return null;
 };
 
+const asRecord = (value: unknown): Record<string, unknown> | null => {
+  if (isRecord(value)) {
+    return value;
+  }
+
+  return parseNestedJsonRecord(value);
+};
+
+const parseToneType = (
+  record: Record<string, unknown> | null
+): Record<string, unknown> | null => asRecord(record?.tonetype);
+
+const ttsEffectType = 11;
+
+// effect_type は TTS 音声が 11、ボイスエフェクト等の別素材がそれ以外になる
+// TTS 以外の素材まで話者として受け入れると合成時に TTSInvalidSpeaker で落ちるため除外する
+const isTtsEffectItem = (record: Record<string, unknown>): boolean => {
+  const effectType = record.effect_type;
+
+  return typeof effectType !== 'number' || effectType === ttsEffectType;
+};
+
+const legacySpeakerPattern = /^(?:ICL_[A-Za-z0-9_]+|BV\d+_streaming|jp_\d+)$/;
+
 /**
  * CapCut の voice item から内部 Speaker へ変換する
  * extra と biz_extra の両方を見て title description speaker を拾う
@@ -31,15 +55,28 @@ export const parseSpeaker = (item: unknown): Speaker | null => {
     return null;
   }
 
-  const extra = parseNestedJsonRecord(item.extra);
-  const bizExtra = parseNestedJsonRecord(item.biz_extra);
+  if (!isTtsEffectItem(commonAttr)) {
+    return null;
+  }
+
+  const extra = asRecord(commonAttr.extra) ?? asRecord(item.extra);
+  const bizExtra = asRecord(commonAttr.biz_extra) ?? asRecord(item.biz_extra);
+  const toneType = parseToneType(extra) ?? parseToneType(bizExtra);
+  const timbre = asRecord(item.timbre);
   const voiceAlias =
     asString(extra?.voice_alias_name) ?? asString(bizExtra?.voice_alias_name);
   const title = asString(commonAttr.title);
   const speaker =
-    JSON.stringify(item).match(
-      /ICL_[A-Za-z0-9_]+|BV\d+_streaming|jp_\d+/
-    )?.[0] ?? null;
+    asString(toneType?.voice_type) ??
+    asString(toneType?.tts_voice) ??
+    asString(extra?.ttp_voice_type) ??
+    asString(bizExtra?.ttp_voice_type) ??
+    asString(timbre?.voice_type) ??
+    asString(timbre?.voice);
+  const tonePlatform =
+    asString(toneType?.platform) ??
+    asString(extra?.tone_platform) ??
+    asString(bizExtra?.tone_platform);
   const description =
     asString(commonAttr.description) ??
     voiceAlias ??
@@ -52,18 +89,20 @@ export const parseSpeaker = (item: unknown): Speaker | null => {
     asString(commonAttr.third_resource_id) ??
     effectId;
 
-  if (!title || !effectId || !resourceId || !speaker) {
+  if (!title || !effectId || !resourceId) {
     return null;
   }
 
   return {
     title,
     description,
-    speaker,
+    ...(speaker ? { speaker } : {}),
     effectId,
     resourceId,
+    ...(tonePlatform === '11labs' ? { ttsPlatform: 2 } : {}),
+    ...(extra?.is_vip === true ? { isVip: true } : {}),
     style: '',
-    language: envLanguageFromSpeaker(speaker),
+    language: speaker ? envLanguageFromSpeaker(speaker) : 'unknown',
   };
 };
 
@@ -88,7 +127,8 @@ export const toSpeakerInfoList = (speakers: Speaker[]): SpeakerInfo[] => {
       return true;
     })
     .map((resolvedSpeaker) => ({
-      id: resolvedSpeaker.speaker,
+      id: resolvedSpeaker.speaker ?? resolvedSpeaker.resourceId,
+      speaker: resolvedSpeaker.speaker,
       resourceId: resolvedSpeaker.resourceId,
       effectId: resolvedSpeaker.effectId,
       name: resolvedSpeaker.title,
@@ -96,7 +136,10 @@ export const toSpeakerInfoList = (speakers: Speaker[]): SpeakerInfo[] => {
       style: resolvedSpeaker.style || '',
       language:
         resolvedSpeaker.language ||
-        envLanguageFromSpeaker(resolvedSpeaker.speaker),
+        (resolvedSpeaker.speaker
+          ? envLanguageFromSpeaker(resolvedSpeaker.speaker)
+          : 'unknown'),
+      isVip: resolvedSpeaker.isVip ?? false,
     }));
 };
 
@@ -110,10 +153,13 @@ const findSpeaker = (
     (resolvedSpeaker) =>
       resolvedSpeaker.effectId.toLowerCase() === normalizedTarget ||
       resolvedSpeaker.resourceId.toLowerCase() === normalizedTarget ||
-      resolvedSpeaker.speaker.toLowerCase() === normalizedTarget ||
+      resolvedSpeaker.speaker?.toLowerCase() === normalizedTarget ||
       resolvedSpeaker.title.toLowerCase() === normalizedTarget
   );
 };
+
+export const supportsMultiPlatformSpeaker = (speaker?: string): boolean =>
+  Boolean(speaker && legacySpeakerPattern.test(speaker));
 
 /**
  * speaker と type 指定から使う Speaker を解決する

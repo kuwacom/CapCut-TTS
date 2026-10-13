@@ -6,6 +6,7 @@ dist/
 .env
 capcut-session.json
 capcut-bundle-config.json
+data/
 
 # generated audio cache
 speaker-preview-temp/

@@ -8,9 +8,6 @@ import { LegacySynthesizeQuerySchema } from '@/schemas/legacySynthesize';
 import legacyCapCutService from '@/services/LegacyCapCutService';
 import logger from '@/services/logger';
 
-const legacyNotConfiguredMessage =
-  'Legacy CapCut endpoint is not configured. Set LEGACY_DEVICE_TIME and LEGACY_SIGN';
-
 /**
  * ### get
  * `/v1/synthesize` を処理する
@@ -33,10 +30,6 @@ export const get = async (
       ErrorCode.VALIDATION_ERROR,
       synthesizeQueryValidation.error.issues
     );
-  }
-
-  if (!legacyCapCutService.isConfigured()) {
-    throw apiError(ErrorCode.SERVICE_UNAVAILABLE, legacyNotConfiguredMessage);
   }
 
   const synthesizeQuery = synthesizeQueryValidation.data;

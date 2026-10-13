@@ -1,5 +1,6 @@
 import { Readable } from 'node:stream';
 import { WebSocket, type RawData } from 'ws';
+import { createEditApiSignature } from '@/api/capcut-edit/apiClient';
 import env from '@/configs/env';
 import { legacySpeakers } from '@/models/capcutLegacySpeakers';
 import logger from '@/services/logger';
@@ -34,20 +35,9 @@ class LegacyCapCutService {
   private refreshTimer: NodeJS.Timeout | null = null;
 
   /**
-   * 旧 token + websocket フローに必要な環境変数が揃っているか
-   */
-  isConfigured() {
-    return Boolean(env.LEGACY_DEVICE_TIME && env.LEGACY_SIGN);
-  }
-
-  /**
    * 起動時の事前ウォームアップ
    */
   async warmup() {
-    if (!this.isConfigured()) {
-      return;
-    }
-
     await this.refreshToken();
   }
 
@@ -87,8 +77,6 @@ class LegacyCapCutService {
    * 現在有効な token を返す
    */
   async getTokenState(): Promise<LegacyTokenState> {
-    this.assertConfigured();
-
     if (this.isTokenReady()) {
       return this.tokenState;
     }
@@ -100,8 +88,6 @@ class LegacyCapCutService {
    * token を取得し、以降の更新も予約する
    */
   async refreshToken(): Promise<LegacyTokenState> {
-    this.assertConfigured();
-
     if (this.refreshPromise) {
       return this.refreshPromise;
     }
@@ -142,13 +128,6 @@ class LegacyCapCutService {
    * 起動中のバックグラウンド更新を開始する
    */
   async startRefreshTask() {
-    if (!this.isConfigured()) {
-      logger.info(
-        'Legacy CapCut endpoint is disabled because LEGACY_DEVICE_TIME / LEGACY_SIGN are not configured'
-      );
-      return;
-    }
-
     try {
       await this.warmup();
     } catch (error) {
@@ -163,22 +142,27 @@ class LegacyCapCutService {
    * 旧 token API を叩く
    */
   private async fetchToken(): Promise<LegacyGetTokenResponse> {
-    const response = await fetch(
-      `${env.LEGACY_CAPCUT_API_URL}/common/tts/token`,
-      {
-        method: 'POST',
-        headers: new Headers({
-          Appvr: LEGACY_CAPCUT_APP_VERSION,
-          'Device-Time': env.LEGACY_DEVICE_TIME ?? '',
-          Origin: env.CAPCUT_WEB_URL,
-          Pf: LEGACY_PLATFORM,
-          Sign: env.LEGACY_SIGN ?? '',
-          'Sign-Ver': LEGACY_SIGN_VERSION,
-          'User-Agent': env.USER_AGENT,
-        }),
-        signal: AbortSignal.timeout(LEGACY_TOKEN_REQUEST_TIMEOUT_MS),
-      }
+    const url = new URL(`${env.LEGACY_CAPCUT_API_URL}/common/tts/token`);
+    const { sign, deviceTime } = createEditApiSignature(
+      url.toString(),
+      LEGACY_PLATFORM,
+      LEGACY_CAPCUT_APP_VERSION,
+      ''
     );
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: new Headers({
+        Appvr: LEGACY_CAPCUT_APP_VERSION,
+        'Device-Time': deviceTime,
+        Origin: env.CAPCUT_WEB_URL,
+        Pf: LEGACY_PLATFORM,
+        Sign: sign,
+        'Sign-Ver': LEGACY_SIGN_VERSION,
+        'User-Agent': env.USER_AGENT,
+      }),
+      signal: AbortSignal.timeout(LEGACY_TOKEN_REQUEST_TIMEOUT_MS),
+    });
 
     if (!response.ok) {
       throw new Error(
@@ -427,19 +411,6 @@ class LegacyCapCutService {
    */
   private isTokenReady() {
     return Boolean(this.tokenState.token && this.tokenState.appKey);
-  }
-
-  /**
-   * 旧ルートが利用可能かをチェックする
-   */
-  private assertConfigured() {
-    if (this.isConfigured()) {
-      return;
-    }
-
-    throw new Error(
-      'Legacy CapCut endpoint is not configured. Set LEGACY_DEVICE_TIME and LEGACY_SIGN'
-    );
   }
 }
 
