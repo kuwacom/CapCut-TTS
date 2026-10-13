@@ -25,21 +25,13 @@ CapCut の TTS を 2 系統の API で扱えるセルフホスト用ラッパー
 - CapCut 側の仕様変更により、突然動かなくなる可能性があります
 - 利用にあたっては、各自の責任で公開範囲や運用方法を判断してください
 
-## クイックスタート（共通）
+## クイックスタート（Docker Compose）
 
-### 1. 依存関係をインストール
-
-```bash
-npm install
-```
-
-### 2. `.env` を作成
+### 1. `.env` を作成
 
 ```bash
 cp .env.example .env
 ```
-
-### 3. `.env` を用意
 
 v2 を使う場合は、次の 2 つを設定してください。
 
@@ -50,7 +42,34 @@ CAPCUT_PASSWORD=your-password
 
 通常は他の値はデフォルトのままで動きます。
 
-### 4. 開発サーバーを起動
+### 2. 起動
+
+```bash
+docker compose up -d
+```
+
+GHCR の公開イメージ（`ghcr.io/kuwacom/capcut-tts:latest`）を取得して `http://localhost:8080` で起動します。
+session や bundle 設定などの書き込み状態は `data/` へ保存されます。
+
+ソースからローカルビルドしたい場合は `docker compose build` を使います。
+
+イメージのタグは次の通りです。
+
+| タグ | 更新タイミング |
+| --- | --- |
+| `latest` | main への merge ごと |
+| `2.3.0` などのバージョン番号 | main への merge ごと |
+| `nightly` | develop の push ごと |
+
+## 開発（ソースから実行）
+
+### 1. 依存関係をインストール
+
+```bash
+npm install
+```
+
+### 2. 開発サーバーを起動
 
 ```bash
 npm run dev

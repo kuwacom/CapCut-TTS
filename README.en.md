@@ -25,21 +25,13 @@ A self-hosted wrapper API that exposes two CapCut TTS routes.
 - It may stop working at any time if CapCut changes its internal implementation
 - Please decide how to publish and operate it at your own risk
 
-## Quick Start (Common)
+## Quick Start (Docker Compose)
 
-### 1. Install dependencies
-
-```bash
-npm install
-```
-
-### 2. Create `.env`
+### 1. Create `.env`
 
 ```bash
 cp .env.example .env
 ```
-
-### 3. Prepare `.env`
 
 For v2, configure the following two values:
 
@@ -50,7 +42,34 @@ CAPCUT_PASSWORD=your-password
 
 The default values are usually enough for everything else.
 
-### 4. Start the development server
+### 2. Start
+
+```bash
+docker compose up -d
+```
+
+This pulls the published image (`ghcr.io/kuwacom/capcut-tts:latest`) and serves `http://localhost:8080`.
+Writable state such as the session and bundle config is stored in `data/`.
+
+To build from source locally, run `docker compose build`.
+
+Image tags:
+
+| Tag | Updated on |
+| --- | --- |
+| `latest` | every merge to main |
+| `2.3.0` style version numbers | every merge to main |
+| `nightly` | every push to develop |
+
+## Development (from source)
+
+### 1. Install dependencies
+
+```bash
+npm install
+```
+
+### 2. Start the development server
 
 ```bash
 npm run dev
